@@ -86,7 +86,7 @@ pnpm test
 # Run with coverage
 pnpm test:coverage
 
-# Run E2E tests (Playwright)
+# Run E2E tests (Playwright; starts full stack from repo root so API works)
 pnpm e2e
 
 # Run E2E with UI
@@ -98,6 +98,8 @@ pnpm lint
 # Security-specific lint
 pnpm lint:security
 ```
+
+For test coverage completeness and gap analysis, see [docs/TEST_COVERAGE.md](docs/TEST_COVERAGE.md).
 
 ### Production (Docker)
 
