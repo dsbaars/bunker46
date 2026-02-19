@@ -16,6 +16,9 @@ jobs:
   lint-and-build:
     name: Lint & Build
     runs-on: ubuntu-latest
+    # Dummy URL only for prisma generate during install; no DB needed for lint/build.
+    env:
+      DATABASE_URL: postgresql://localhost:5432/ci?schema=public
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -49,6 +52,9 @@ jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
+    # Dummy URL only for prisma generate during install; unit tests mock Prisma.
+    env:
+      DATABASE_URL: postgresql://localhost:5432/ci?schema=public
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -73,6 +79,22 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bunker46
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bunker46
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -90,6 +112,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Push database schema
+        run: pnpm --filter @bunker46/server run db:push
 
       - name: Install Playwright browsers (Chromium)
         run: pnpm exec playwright install chromium --with-deps
