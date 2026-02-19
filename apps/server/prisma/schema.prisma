@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String?  @unique
+  passwordHash String   @map("password_hash")
+  totpSecret   String?  @map("totp_secret")
+  totpEnabled  Boolean  @default(false) @map("totp_enabled")
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sessions    Session[]
+  passkeys    Passkey[]
+  nsecKeys    NsecKey[]
+  connections BunkerConnection[]
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  refreshToken String   @unique @map("refresh_token")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  totpVerified Boolean  @default(false) @map("totp_verified")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Passkey {
+  id                  String   @id @default(cuid())
+  userId              String   @map("user_id")
+  credentialId        String   @unique @map("credential_id")
+  credentialPublicKey Bytes    @map("credential_public_key")
+  counter             BigInt   @default(0)
+  transports          String[] @default([])
+  name                String   @default("My Passkey")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+model NsecKey {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  publicKey      String   @map("public_key")
+  encryptedNsec  String   @map("encrypted_nsec")
+  label          String   @default("Default Key")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connections BunkerConnection[]
+
+  @@unique([userId, publicKey])
+  @@index([userId])
+  @@map("nsec_keys")
+}
+
+model BunkerConnection {
+  id              String           @id @default(cuid())
+  userId          String           @map("user_id")
+  nsecKeyId       String           @map("nsec_key_id")
+  clientPubkey    String           @map("client_pubkey")
+  remotePubkey    String?          @map("remote_pubkey")
+  name            String           @default("Unnamed Connection")
+  logoUrl         String?          @map("logo_url")
+  status          ConnectionStatus @default(PENDING)
+  relays          String[]         @default([])
+  secret          String?
+  loggingEnabled  Boolean          @default(false) @map("logging_enabled")
+  lastActivity    DateTime?        @map("last_activity")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nsecKey     NsecKey                @relation(fields: [nsecKeyId], references: [id], onDelete: Cascade)
+  permissions ConnectionPermission[]
+  logs        SigningLog[]
+
+  @@unique([clientPubkey, nsecKeyId])
+  @@index([userId])
+  @@index([clientPubkey])
+  @@map("bunker_connections")
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+model ConnectionPermission {
+  id           String @id @default(cuid())
+  connectionId String @map("connection_id")
+  method       String
+  kind         Int?
+  allowed      Boolean @default(true)
+
+  connection BunkerConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, method, kind])
+  @@index([connectionId])
+  @@map("connection_permissions")
+}
+
+model SigningLog {
+  id           String   @id @default(cuid())
+  connectionId String   @map("connection_id")
+  method       String
+  eventKind    Int?     @map("event_kind")
+  result       LogResult
+  durationMs   Int      @map("duration_ms")
+  errorMessage String?  @map("error_message")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  connection BunkerConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId])
+  @@index([createdAt])
+  @@index([method])
+  @@map("signing_logs")
+}
+
+enum LogResult {
+  APPROVED
+  DENIED
+  ERROR
+}
+
+model RelayConfig {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  isHealthy Boolean  @default(true) @map("is_healthy")
+  lastCheck DateTime? @map("last_check")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("relay_configs")
+}

@@ -1,0 +1,47 @@
+{
+  "name": "bunker46",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NIP-46 Nsec Bunker Management Tool",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.10.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:server": "pnpm --filter @bunker46/server run dev",
+    "dev:web": "pnpm --filter @bunker46/web run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "lint:security": "pnpm -r run lint:security",
+    "format": "prettier --write \"**/*.{ts,vue,json,md,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,vue,json,md,yaml}\"",
+    "test": "pnpm -r run test",
+    "test:coverage": "pnpm -r run test:coverage",
+    "e2e": "pnpm --filter @bunker46/web run e2e",
+    "e2e:ui": "pnpm --filter @bunker46/web run e2e:ui",
+    "db:migrate": "pnpm --filter @bunker46/server run db:migrate",
+    "db:generate": "pnpm --filter @bunker46/server run db:generate",
+    "db:push": "pnpm --filter @bunker46/server run db:push",
+    "clean": "pnpm -r run clean && rm -rf node_modules",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "argon2",
+      "esbuild"
+    ]
+  }
+}

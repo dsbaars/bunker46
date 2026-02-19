@@ -1,0 +1,22 @@
+{
+  "name": "@bunker46/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./node": "./node.js",
+    "./vue": "./vue.js"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint-plugin-security": "^3.0.1",
+    "typescript-eslint": "^8.25.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.20.0",
+    "eslint-plugin-vue": "^9.32.0"
+  }
+}
