@@ -13,6 +13,7 @@
     "dev": "pnpm -r --parallel run dev",
     "dev:server": "pnpm --filter @bunker46/server run dev",
     "dev:web": "pnpm --filter @bunker46/web run dev",
+    "kill-port": "for p in 3000 5173; do pid=$(lsof -ti :$p 2>/dev/null); [ -n \"$pid\" ] && kill -9 $pid && echo \"Killed PID $pid on port $p\"; done; echo Done",
     "build": "pnpm -r run build",
     "lint": "pnpm -r run lint",
     "lint:security": "pnpm -r run lint:security",

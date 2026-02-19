@@ -4,7 +4,11 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore } from '@/stores/settings';
 import { api } from '@/lib/api';
-import { startAuthentication } from '@simplewebauthn/browser';
+import type { UserProfileDto } from '@bunker46/shared-types';
+import {
+  startAuthentication,
+  type PublicKeyCredentialRequestOptionsJSON,
+} from '@simplewebauthn/browser';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
 import Card from '@/components/ui/Card.vue';
@@ -23,29 +27,49 @@ const passkeyError = ref('');
 const passkeyLoading = ref(false);
 const showPasskeyForm = ref(false);
 
+/** Normalize token keys from API (camelCase or snake_case). */
+function tokensFrom(res: Record<string, unknown>): { accessToken?: string; refreshToken?: string } {
+  const accessToken = (res.accessToken as string) ?? (res.access_token as string);
+  const refreshToken = (res.refreshToken as string) ?? (res.refresh_token as string);
+  return { accessToken, refreshToken };
+}
+
 async function handleLogin() {
   error.value = '';
   loading.value = true;
   try {
-    const res = await api.post<{
-      accessToken?: string;
-      refreshToken?: string;
-      requiresTotp?: boolean;
-      partialToken?: string;
-    }>('/auth/login', { username: username.value, password: password.value });
+    const res = await api.post<Record<string, unknown>>('/auth/login', {
+      username: username.value,
+      password: password.value,
+    });
 
-    if (res.requiresTotp && res.partialToken) {
-      auth.setRequiresTotp(res.partialToken);
+    const partialToken = (res.partialToken as string) ?? (res.partial_token as string);
+    const requiresTotp = res.requiresTotp === true || res.requires_totp === true;
+    if (requiresTotp && partialToken) {
+      auth.setRequiresTotp(partialToken);
       router.push('/2fa/verify');
-    } else if (res.accessToken) {
-      auth.setTokens(res.accessToken, res.refreshToken);
-      const profile = await api.get<any>('/users/me');
+      return;
+    }
+
+    const { accessToken, refreshToken } = tokensFrom(res);
+    if (!accessToken) {
+      error.value = 'Invalid response from server. Please try again.';
+      return;
+    }
+
+    auth.setTokens(accessToken, refreshToken);
+    try {
+      const profile = await api.get<UserProfileDto>('/users/me');
       auth.setUser(profile);
-      await settings.load(res.accessToken);
+      await settings.load(accessToken);
       router.push('/dashboard');
+    } catch {
+      auth.logout();
+      error.value = 'Session could not be verified. Please try again.';
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Login failed';
+    const msg = err instanceof Error ? err.message : 'Login failed';
+    error.value = msg === 'Failed to fetch' ? 'Network error. Is the server running?' : msg;
   } finally {
     loading.value = false;
   }
@@ -60,29 +84,45 @@ async function handlePasskeyLogin() {
       showPasskeyForm.value && passkeyUsername.value.trim()
         ? { username: passkeyUsername.value.trim() }
         : {};
-    const { options, userId } = await api.post<{ options: any; userId?: string }>(
+    const opts = await api.post<{ options: unknown; userId?: string }>(
       '/auth/passkey/login/options',
       payload,
     );
-    const authResp = await startAuthentication({ optionsJSON: options });
-    const verifyPayload = userId ? { userId, response: authResp } : { response: authResp };
-    const res = await api.post<{
-      verified: boolean;
-      accessToken?: string;
-      refreshToken?: string;
-    }>('/auth/passkey/login/verify', verifyPayload);
-
-    if (res.verified && res.accessToken) {
-      auth.setTokens(res.accessToken, res.refreshToken);
-      const profile = await api.get<any>('/users/me');
-      auth.setUser(profile);
-      await settings.load(res.accessToken);
-      router.push('/dashboard');
-    } else {
-      passkeyError.value = 'Passkey verification failed';
+    const options = opts.options;
+    const userId = opts.userId;
+    if (!options) {
+      passkeyError.value = 'Invalid response from server.';
+      return;
     }
+    const authResp = await startAuthentication({
+      optionsJSON: options as PublicKeyCredentialRequestOptionsJSON,
+    });
+    const verifyPayload = userId ? { userId, response: authResp } : { response: authResp };
+    const res = await api.post<Record<string, unknown>>(
+      '/auth/passkey/login/verify',
+      verifyPayload,
+    );
+
+    const verified = res.verified === true;
+    const { accessToken, refreshToken } = tokensFrom(res);
+    if (verified && accessToken) {
+      auth.setTokens(accessToken, refreshToken);
+      try {
+        const profile = await api.get<UserProfileDto>('/users/me');
+        auth.setUser(profile);
+        await settings.load(accessToken);
+        router.push('/dashboard');
+      } catch {
+        auth.logout();
+        passkeyError.value = 'Session could not be verified. Please try again.';
+      }
+      return;
+    }
+
+    passkeyError.value = 'Passkey verification failed';
   } catch (err) {
-    passkeyError.value = err instanceof Error ? err.message : 'Passkey login failed';
+    const msg = err instanceof Error ? err.message : 'Passkey login failed';
+    passkeyError.value = msg === 'Failed to fetch' ? 'Network error. Is the server running?' : msg;
   } finally {
     passkeyLoading.value = false;
   }

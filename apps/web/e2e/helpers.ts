@@ -51,10 +51,21 @@ export async function registerAndLogin(
  * Log in via the UI with the given credentials. Waits for redirect to dashboard.
  */
 export async function login(page: Page, username: string, password: string) {
-  await page.goto('/login');
+  await page.goto('/login', { waitUntil: 'networkidle' });
   await page.getByPlaceholder('Enter username').fill(username);
   await page.getByPlaceholder('Enter password').fill(password);
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
+  try {
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
+  } catch {
+    const errText = await page
+      .locator('.text-destructive')
+      .first()
+      .textContent()
+      .catch(() => '');
+    throw new Error(
+      `Login did not redirect to dashboard.${errText ? ` Page error: ${errText.trim()}` : ''}`,
+    );
+  }
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 5000 });
 }

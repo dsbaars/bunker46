@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Strategy } from 'passport-jwt';
+import type { FastifyRequest } from 'fastify';
 
 interface JwtPayload {
   sub: string;
@@ -9,13 +10,32 @@ interface JwtPayload {
   sessionId?: string;
 }
 
+const secret = process.env['JWT_SECRET'] ?? 'dev-secret-change-me';
+
+type RequestWithHeaders = FastifyRequest & {
+  raw?: { headers?: Record<string, string | string[] | undefined> };
+};
+
+/** Extract Bearer token from Authorization header. Works with Fastify or raw Node request. */
+function jwtFromRequest(req: RequestWithHeaders): string | null {
+  const h = req?.headers ?? req.raw?.headers;
+  if (!h) return null;
+  const raw =
+    (h as Record<string, string | string[] | undefined>)['authorization'] ??
+    (h as Record<string, string | string[] | undefined>)['Authorization'];
+  const auth = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return null;
+  return auth.slice(7);
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest,
       ignoreExpiration: false,
-      secretOrKey: process.env['JWT_SECRET'] ?? 'dev-secret-change-me',
+      secretOrKey: secret,
+      algorithms: ['HS256'],
     });
   }
 

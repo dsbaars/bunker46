@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from '@nanostores/vue';
 import {
@@ -24,6 +24,10 @@ const ui = useUiStore();
 const uiState = useStore($ui);
 const settingsStore = useSettingsStore();
 const mobileMenuOpen = ref(false);
+
+onMounted(() => {
+  auth.refetchProfileIfMissing();
+});
 
 const showLayout = computed(() => {
   const guestRoutes = ['login', 'register', '2fa-verify'];

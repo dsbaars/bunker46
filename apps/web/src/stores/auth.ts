@@ -18,13 +18,17 @@ const $auth = atom<AuthState>({
   requiresTotp: false,
 });
 
-async function fetchProfile(accessToken: string): Promise<UserProfileDto | null> {
+type ProfileResult = { profile: UserProfileDto } | { unauthorized: true } | null;
+
+async function fetchProfile(accessToken: string): Promise<ProfileResult> {
   try {
     const res = await fetch('/api/users/me', {
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     });
+    if (res.status === 401) return { unauthorized: true };
     if (!res.ok) return null;
-    return res.json();
+    const profile = await res.json();
+    return { profile };
   } catch {
     return null;
   }
@@ -83,6 +87,19 @@ export function useAuthStore() {
       authStorage.removeItem('tokens');
     },
 
+    /** Call when we have a token but no user (e.g. after transient restore failure). */
+    async refetchProfileIfMissing() {
+      const { accessToken, user } = $auth.get();
+      if (!accessToken || user) return;
+      const result = await fetchProfile(accessToken);
+      if (result?.profile) {
+        $auth.set({ ...$auth.get(), user: result.profile });
+      } else if (result?.unauthorized) {
+        $auth.set({ accessToken: null, refreshToken: null, user: null, requiresTotp: false });
+        await authStorage.removeItem('tokens');
+      }
+    },
+
     async restore() {
       const tokens = await authStorage.getItem<{ accessToken: string; refreshToken: string }>(
         'tokens',
@@ -95,9 +112,13 @@ export function useAuthStore() {
         refreshToken: tokens.refreshToken,
       });
 
-      let profile = await fetchProfile(tokens.accessToken);
+      let result = await fetchProfile(tokens.accessToken);
 
-      if (!profile && tokens.refreshToken) {
+      if (result?.profile) {
+        $auth.set({ ...$auth.get(), user: result.profile });
+        return;
+      }
+      if (result?.unauthorized && tokens.refreshToken) {
         const refreshed = await tryRefreshTokens(tokens.refreshToken);
         if (refreshed) {
           $auth.set({
@@ -109,16 +130,19 @@ export function useAuthStore() {
             accessToken: refreshed.accessToken,
             refreshToken: refreshed.refreshToken,
           });
-          profile = await fetchProfile(refreshed.accessToken);
+          result = await fetchProfile(refreshed.accessToken);
+          if (result?.profile) {
+            $auth.set({ ...$auth.get(), user: result.profile });
+            return;
+          }
         }
       }
-
-      if (profile) {
-        $auth.set({ ...$auth.get(), user: profile });
-      } else {
+      // 401 and refresh failed or no refresh: clear tokens so user gets login, not dashboard with no data
+      if (result?.unauthorized) {
         $auth.set({ accessToken: null, refreshToken: null, user: null, requiresTotp: false });
         await authStorage.removeItem('tokens');
       }
+      // result === null: network error; keep tokens so guard still redirects, profile may load later
     },
   };
 }

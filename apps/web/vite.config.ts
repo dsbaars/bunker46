@@ -16,6 +16,13 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+        // Ensure Authorization (Bearer token) is forwarded so /api/users/me and other auth routes work
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const auth = req.headers['authorization'];
+            if (auth) proxyReq.setHeader('Authorization', auth);
+          });
+        },
       },
     },
   },

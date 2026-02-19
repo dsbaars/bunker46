@@ -18,6 +18,12 @@ const confirmPassword = ref('');
 const error = ref('');
 const loading = ref(false);
 
+function tokensFrom(res: Record<string, unknown>): { accessToken?: string; refreshToken?: string } {
+  const accessToken = (res.accessToken as string) ?? (res.access_token as string);
+  const refreshToken = (res.refreshToken as string) ?? (res.refresh_token as string);
+  return { accessToken, refreshToken };
+}
+
 async function handleRegister() {
   if (password.value !== confirmPassword.value) {
     error.value = 'Passwords do not match';
@@ -26,15 +32,21 @@ async function handleRegister() {
   error.value = '';
   loading.value = true;
   try {
-    const res = await api.post<{ accessToken: string; refreshToken: string }>('/auth/register', {
+    const res = await api.post<Record<string, unknown>>('/auth/register', {
       username: username.value,
       password: password.value,
     });
-    auth.setTokens(res.accessToken, res.refreshToken);
-    await settings.load(res.accessToken);
-    router.push('/dashboard');
+    const { accessToken, refreshToken } = tokensFrom(res);
+    if (accessToken) {
+      auth.setTokens(accessToken, refreshToken);
+      await settings.load(accessToken);
+      router.push('/dashboard');
+      return;
+    }
+    error.value = 'Invalid response from server. Please try again.';
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Registration failed';
+    const msg = err instanceof Error ? err.message : 'Registration failed';
+    error.value = msg === 'Failed to fetch' ? 'Network error. Is the server running?' : msg;
   } finally {
     loading.value = false;
   }
