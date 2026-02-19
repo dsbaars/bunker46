@@ -2,8 +2,8 @@ import { Controller, Get, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { TotpVerifiedGuard } from '../auth/guards/totp-verified.guard.js';
-import type { LoggingService } from './logging.service.js';
-import type { StatsService } from './stats.service.js';
+import { LoggingService } from './logging.service.js';
+import { StatsService } from './stats.service.js';
 import type { FastifyRequest } from 'fastify';
 
 type AuthReq = FastifyRequest & { user: { sub: string } };

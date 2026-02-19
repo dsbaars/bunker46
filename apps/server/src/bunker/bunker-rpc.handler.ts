@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ConnectionsService } from '../connections/connections.service.js';
-import type { LoggingService } from '../logging/logging.service.js';
-import type { EncryptionService } from '../common/crypto/encryption.service.js';
+import { ConnectionsService } from '../connections/connections.service.js';
+import { LoggingService } from '../logging/logging.service.js';
+import { EncryptionService } from '../common/crypto/encryption.service.js';
 import {
   checkPermission,
   parsePermissionList,

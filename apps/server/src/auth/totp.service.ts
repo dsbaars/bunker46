@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { authenticator } from 'otplib';
-import type { EncryptionService } from '../common/crypto/encryption.service.js';
-import type { UsersService } from '../users/users.service.js';
+import { EncryptionService } from '../common/crypto/encryption.service.js';
+import { UsersService } from '../users/users.service.js';
 import * as QRCode from 'qrcode';
 
 @Injectable()

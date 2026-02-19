@@ -11,10 +11,10 @@ import {
   Param,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import type { AuthService } from './auth.service.js';
-import type { TotpService } from './totp.service.js';
-import type { PasskeyService } from './passkey.service.js';
-import type { UsersService } from '../users/users.service.js';
+import { AuthService } from './auth.service.js';
+import { TotpService } from './totp.service.js';
+import { PasskeyService } from './passkey.service.js';
+import { UsersService } from '../users/users.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import type { FastifyRequest } from 'fastify';
 

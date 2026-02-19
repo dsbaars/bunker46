@@ -4,11 +4,11 @@ import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import * as nip44 from 'nostr-tools/nip44';
 import * as nip04 from 'nostr-tools/nip04';
-import type { BunkerRpcHandler } from './bunker-rpc.handler.js';
+import { BunkerRpcHandler } from './bunker-rpc.handler.js';
 import { Nip46RequestSchema } from '@bunker46/shared-types';
 import { NOSTR_CONSTANTS } from '@bunker46/config';
-import type { PrismaService } from '../prisma/prisma.service.js';
-import type { EncryptionService } from '../common/crypto/encryption.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { useWebSocketImplementation } from 'nostr-tools/pool';
 import WebSocket from 'ws';
 

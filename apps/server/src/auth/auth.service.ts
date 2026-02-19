@@ -1,8 +1,8 @@
 import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
-import type { JwtService } from '@nestjs/jwt';
-import type { PrismaService } from '../prisma/prisma.service.js';
-import type { UsersService } from '../users/users.service.js';
-import type { TotpService } from './totp.service.js';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { UsersService } from '../users/users.service.js';
+import { TotpService } from './totp.service.js';
 import { randomBytes } from 'node:crypto';
 
 interface JwtPayload {

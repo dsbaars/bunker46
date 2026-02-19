@@ -17,7 +17,7 @@ import {
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { TotpVerifiedGuard } from '../auth/guards/totp-verified.guard.js';
-import type { ConnectionsService } from './connections.service.js';
+import { ConnectionsService } from './connections.service.js';
 import { BunkerService } from '../bunker/bunker.service.js';
 import { parsePermissionList, type PermissionDescriptor } from '@bunker46/shared-types';
 import type { FastifyRequest } from 'fastify';

@@ -17,6 +17,11 @@ export default [
   ...nodeConfig
     .filter((c) => !c.ignores)
     .map((c) => ({ ...c, files: ['apps/server/**/*.ts', 'packages/**/*.ts'] })),
+  // NestJS needs runtime class references for DI; type-only imports break the container.
+  {
+    files: ['apps/server/**/*.ts'],
+    rules: { '@typescript-eslint/consistent-type-imports': 'off' },
+  },
   ...vueConfig
     .filter((c) => !c.ignores)
     .map((c) => ({ ...c, files: ['apps/web/**/*.ts', 'apps/web/**/*.vue'] })),

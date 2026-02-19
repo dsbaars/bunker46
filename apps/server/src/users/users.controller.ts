@@ -1,7 +1,7 @@
 import { Controller, Get, Patch, Body, UseGuards, Req, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import type { UsersService } from './users.service.js';
+import { UsersService } from './users.service.js';
 import type { UserProfileDto, UserSettingsDto } from '@bunker46/shared-types';
 import type { FastifyRequest } from 'fastify';
 
