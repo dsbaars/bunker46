@@ -4,14 +4,14 @@ A modern, secure NIP-46 Nsec Bunker management tool built with TypeScript.
 
 ## Stack
 
-| Layer        | Technology                                                          |
-| ------------ | ------------------------------------------------------------------- |
-| **Frontend** | Vue 3, Vite 7, Tailwind CSS v4, shadcn-vue, nanostores, localforage |
-| **Backend**  | NestJS 11, Fastify, Prisma ORM, nostr-tools                         |
-| **Database** | PostgreSQL 17                                                       |
-| **Auth**     | JWT + Argon2, TOTP (otplib), WebAuthn/Passkeys (@simplewebauthn)    |
-| **Testing**  | Vitest, Playwright, eslint-plugin-security                          |
-| **Infra**    | Docker, Docker Compose, Node 24, pnpm 10                            |
+| Layer        | Technology                                                                   |
+| ------------ | ---------------------------------------------------------------------------- |
+| **Frontend** | Vue 3, Vite 7, Tailwind CSS v4, shadcn-vue, nanostores, localforage          |
+| **Backend**  | NestJS 11, Fastify, Prisma ORM, nostr-tools                                  |
+| **Database** | PostgreSQL 17                                                                |
+| **Auth**     | JWT + Argon2, TOTP (otplib), WebAuthn/Passkeys (@simplewebauthn)             |
+| **Testing**  | Vitest, Playwright, eslint-plugin-security                                   |
+| **Infra**    | Docker, Docker Compose, Node 24, pnpm 10, Redis (optional, for live updates) |
 
 ## Architecture
 
@@ -20,9 +20,10 @@ bunker46/
 ├── apps/
 │   ├── server/          # NestJS + Fastify backend
 │   │   ├── src/
-│   │   │   ├── auth/    # JWT, TOTP, WebAuthn
+│   │   │   ├── auth/    # JWT, TOTP, WebAuthn, session management
 │   │   │   ├── bunker/  # NIP-46 RPC handler, relay pool, URI parsing
 │   │   │   ├── connections/ # CRUD for bunker connections & permissions
+│   │   │   ├── events/  # Redis pub/sub, SSE stream (live dashboard/connections)
 │   │   │   ├── logging/ # Signing logs & dashboard stats
 │   │   │   ├── users/   # User management
 │   │   │   ├── prisma/  # Database service
@@ -64,6 +65,7 @@ docker compose -f docker-compose.dev.yml up -d
 
 # Copy environment config
 cp .env.example .env
+# Optional: set REDIS_URL=redis://localhost:6379 in .env for live dashboard/connections updates
 
 # Generate Prisma client & run migrations
 pnpm db:generate
@@ -73,7 +75,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The frontend will be available at `http://localhost:5173` and the API at `http://localhost:3000`.
+The frontend will be available at `http://localhost:5173` and the API at `http://localhost:3000`. With Redis running and `REDIS_URL` set, the dashboard and connections list refresh automatically when activity occurs.
 
 ### Testing
 
@@ -124,9 +126,20 @@ This tool implements the full [NIP-46 Nostr Remote Signing](https://nips.nostr.c
 - Passwords hashed with Argon2
 - 2FA via TOTP and WebAuthn/Passkeys
 - JWT with short-lived access tokens and refresh token rotation
+- **Session management**: list active sessions (with IP and user-agent), revoke a session, or log out all other sessions
 - HTTP-only secure cookies option
 - Security ESLint rules enforced
 - Non-root Docker containers
+
+## Dependencies
+
+To check for outdated packages across the monorepo:
+
+```bash
+pnpm outdated -r
+```
+
+Several dependencies have newer major versions available (e.g. Prisma 7, Vitest 4, Vue Router 5, Zod 4). Upgrade when ready and run tests; pin to current majors if you prefer stability.
 
 ## License
 
