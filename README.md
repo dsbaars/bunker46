@@ -79,6 +79,13 @@ pnpm dev
 
 The frontend will be available at `http://localhost:5173` and the API at `http://localhost:3000`. With Redis running and `REDIS_URL` set, the dashboard and connections list refresh automatically when activity occurs.
 
+If ports 3000 or 5173 are already in use (e.g. a previous dev run didn’t exit cleanly), free them and restart:
+
+```bash
+pnpm kill-port
+pnpm dev
+```
+
 ### Testing
 
 ```bash
@@ -90,6 +97,9 @@ pnpm test:coverage
 
 # Run E2E tests (Playwright; starts full stack from repo root so API works)
 pnpm e2e
+
+# If you already have `pnpm dev` running, reuse it to avoid port conflicts:
+# CI= pnpm e2e
 
 # Run E2E with UI
 pnpm e2e:ui
