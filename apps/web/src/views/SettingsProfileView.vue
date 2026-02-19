@@ -22,14 +22,9 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold mb-6">
-      Profile Settings
-    </h1>
+    <h1 class="text-2xl font-bold mb-6">Profile Settings</h1>
 
-    <Card
-      v-if="profile"
-      class="max-w-lg"
-    >
+    <Card v-if="profile" class="max-w-lg">
       <div class="space-y-4">
         <div>
           <label class="text-sm font-medium text-muted-foreground">Username</label>

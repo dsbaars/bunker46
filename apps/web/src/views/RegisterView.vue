@@ -56,26 +56,15 @@ async function handleRegister() {
 <template>
   <div class="w-full max-w-md mx-auto">
     <div class="text-center mb-8">
-      <h1 class="text-2xl font-bold">
-        Create Account
-      </h1>
-      <p class="text-muted-foreground mt-2">
-        Set up your Bunker46 account
-      </p>
+      <h1 class="text-2xl font-bold">Create Account</h1>
+      <p class="text-muted-foreground mt-2">Set up your Bunker46 account</p>
     </div>
 
     <Card>
-      <form
-        class="space-y-4"
-        @submit.prevent="handleRegister"
-      >
+      <form class="space-y-4" @submit.prevent="handleRegister">
         <div>
           <label class="text-sm font-medium mb-1.5 block">Username</label>
-          <Input
-            v-model="username"
-            placeholder="Choose a username"
-            autocomplete="username"
-          />
+          <Input v-model="username" placeholder="Choose a username" autocomplete="username" />
         </div>
         <div>
           <label class="text-sm font-medium mb-1.5 block">Password</label>
@@ -95,28 +84,15 @@ async function handleRegister() {
             autocomplete="new-password"
           />
         </div>
-        <p
-          v-if="error"
-          class="text-sm text-destructive"
-        >
+        <p v-if="error" class="text-sm text-destructive">
           {{ error }}
         </p>
-        <Button
-          :loading="loading"
-          class="w-full"
-        >
-          Create Account
-        </Button>
+        <Button :loading="loading" class="w-full"> Create Account </Button>
       </form>
 
       <div class="mt-4 text-center text-sm text-muted-foreground">
         Already have an account?
-        <router-link
-          to="/login"
-          class="text-primary hover:underline"
-        >
-          Sign in
-        </router-link>
+        <router-link to="/login" class="text-primary hover:underline"> Sign in </router-link>
       </div>
     </Card>
   </div>

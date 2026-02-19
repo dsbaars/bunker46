@@ -26,10 +26,7 @@ defineProps<{
               <HelpCircle class="w-3.5 h-3.5 shrink-0" />
             </span>
           </TooltipTrigger>
-          <TooltipContent
-            side="top"
-            class="max-w-[240px]"
-          >
+          <TooltipContent side="top" class="max-w-[240px]">
             <p class="leading-relaxed">
               {{ tooltip }}
             </p>
@@ -41,10 +38,7 @@ defineProps<{
     <div class="text-2xl font-bold">
       {{ value }}
     </div>
-    <p
-      v-if="description"
-      class="text-xs text-muted-foreground mt-1"
-    >
+    <p v-if="description" class="text-xs text-muted-foreground mt-1">
       {{ description }}
     </p>
   </Card>

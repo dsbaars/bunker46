@@ -1,1 +1,4 @@
 pnpm lint-staged
+pnpm run format
+git add -u
+pnpm run format:check

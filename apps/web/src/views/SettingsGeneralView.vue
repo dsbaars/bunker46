@@ -69,25 +69,13 @@ function previewTime(): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold mb-6">
-      General Settings
-    </h1>
+    <h1 class="text-2xl font-bold mb-6">General Settings</h1>
 
-    <div
-      v-if="loading"
-      class="text-sm text-muted-foreground"
-    >
-      Loading…
-    </div>
+    <div v-if="loading" class="text-sm text-muted-foreground">Loading…</div>
 
-    <div
-      v-else
-      class="space-y-6 max-w-lg"
-    >
+    <div v-else class="space-y-6 max-w-lg">
       <Card>
-        <h2 class="text-lg font-semibold mb-1">
-          Date &amp; Time Format
-        </h2>
+        <h2 class="text-lg font-semibold mb-1">Date &amp; Time Format</h2>
         <p class="text-sm text-muted-foreground mb-5">
           Choose how dates and times are displayed across the app.
         </p>
@@ -110,7 +98,7 @@ function previewTime(): string {
                   type="radio"
                   :value="opt.value"
                   class="accent-primary"
-                >
+                />
                 <span class="text-sm font-mono">{{ opt.label }}</span>
               </label>
             </div>
@@ -133,7 +121,7 @@ function previewTime(): string {
                   type="radio"
                   :value="opt.value"
                   class="accent-primary"
-                >
+                />
                 <span class="text-sm font-mono">{{ opt.label }}</span>
               </label>
             </div>
@@ -141,31 +129,16 @@ function previewTime(): string {
 
           <!-- Preview -->
           <div class="rounded-lg bg-muted/50 p-4">
-            <p class="text-xs text-muted-foreground mb-1">
-              Preview
-            </p>
-            <p class="text-sm font-mono">
-              {{ previewDate() }} · {{ previewTime() }}
-            </p>
+            <p class="text-xs text-muted-foreground mb-1">Preview</p>
+            <p class="text-sm font-mono">{{ previewDate() }} · {{ previewTime() }}</p>
           </div>
 
           <div class="flex items-center gap-3">
-            <Button
-              :loading="saving"
-              @click="save"
-            >
-              Save Preferences
-            </Button>
-            <p
-              v-if="success"
-              class="text-sm text-green-600 dark:text-green-400"
-            >
+            <Button :loading="saving" @click="save"> Save Preferences </Button>
+            <p v-if="success" class="text-sm text-green-600 dark:text-green-400">
               {{ success }}
             </p>
-            <p
-              v-if="error"
-              class="text-sm text-destructive"
-            >
+            <p v-if="error" class="text-sm text-destructive">
               {{ error }}
             </p>
           </div>

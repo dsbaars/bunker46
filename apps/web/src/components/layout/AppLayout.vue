@@ -51,17 +51,11 @@ function handleLogout() {
 </script>
 
 <template>
-  <div
-    v-if="!showLayout"
-    class="min-h-screen flex items-center justify-center bg-background"
-  >
+  <div v-if="!showLayout" class="min-h-screen flex items-center justify-center bg-background">
     <slot />
   </div>
 
-  <div
-    v-else
-    class="min-h-screen flex bg-background"
-  >
+  <div v-else class="min-h-screen flex bg-background">
     <aside
       :class="[
         'fixed inset-y-0 left-0 z-50 flex flex-col bg-card border-r border-border transition-all duration-300',
@@ -70,15 +64,10 @@ function handleLogout() {
       ]"
     >
       <div class="flex items-center gap-2 h-16 px-4 border-b border-border shrink-0">
-        <img
-          src="/logo.png"
-          alt="Bunker46"
-          class="w-8 h-8 rounded-lg object-contain shrink-0"
+        <img src="/logo.png" alt="Bunker46" class="w-8 h-8 rounded-lg object-contain shrink-0" />
+        <span v-if="!uiState.sidebarCollapsed" class="font-semibold text-lg truncate"
+          >Bunker46</span
         >
-        <span
-          v-if="!uiState.sidebarCollapsed"
-          class="font-semibold text-lg truncate"
-        >Bunker46</span>
         <button
           v-if="!uiState.sidebarCollapsed"
           type="button"
@@ -103,10 +92,7 @@ function handleLogout() {
           ]"
           @click="mobileMenuOpen = false"
         >
-          <component
-            :is="item.icon"
-            class="w-5 h-5 shrink-0"
-          />
+          <component :is="item.icon" class="w-5 h-5 shrink-0" />
           <span v-if="!uiState.sidebarCollapsed">{{ item.name }}</span>
         </router-link>
       </nav>
@@ -149,19 +135,10 @@ function handleLogout() {
         <div class="flex-1" />
 
         <div class="flex items-center gap-3">
-          <span
-            v-if="auth.user"
-            class="text-sm text-muted-foreground hidden sm:block"
-          >
+          <span v-if="auth.user" class="text-sm text-muted-foreground hidden sm:block">
             {{ auth.user.username }}
           </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            @click="handleLogout"
-          >
-            Logout
-          </Button>
+          <Button variant="ghost" size="sm" @click="handleLogout"> Logout </Button>
         </div>
       </header>
 

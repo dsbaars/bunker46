@@ -254,18 +254,14 @@ async function handleChangePassword() {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold mb-6">
-      Security Settings
-    </h1>
+    <h1 class="text-2xl font-bold mb-6">Security Settings</h1>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
       <div class="space-y-6 max-w-lg">
         <!-- TOTP -->
         <Card>
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold">
-              Two-Factor Authentication
-            </h2>
+            <h2 class="text-lg font-semibold">Two-Factor Authentication</h2>
             <Badge :variant="totpEnabled ? 'default' : 'secondary'">
               {{ totpEnabled ? 'Enabled' : 'Disabled' }}
             </Badge>
@@ -275,10 +271,7 @@ async function handleChangePassword() {
             Use an authenticator app to generate time-based one-time passwords.
           </p>
 
-          <div
-            v-if="totpSuccess"
-            class="text-sm text-green-600 dark:text-green-400 mb-4"
-          >
+          <div v-if="totpSuccess" class="text-sm text-green-600 dark:text-green-400 mb-4">
             {{ totpSuccess }}
           </div>
 
@@ -288,11 +281,7 @@ async function handleChangePassword() {
               Scan this QR code with your authenticator app, then enter the 6-digit code to confirm.
             </p>
             <div class="flex justify-center mb-4">
-              <img
-                :src="totpSetup.qrCodeDataUrl"
-                alt="TOTP QR Code"
-                class="rounded-lg"
-              >
+              <img :src="totpSetup.qrCodeDataUrl" alt="TOTP QR Code" class="rounded-lg" />
             </div>
             <p class="text-xs text-muted-foreground text-center mb-4 font-mono break-all">
               {{ totpSetup.secret }}
@@ -304,51 +293,25 @@ async function handleChangePassword() {
                 class="flex-1"
                 maxlength="6"
               />
-              <Button
-                :loading="totpLoading"
-                @click="confirmTotp"
-              >
-                Verify
-              </Button>
+              <Button :loading="totpLoading" @click="confirmTotp"> Verify </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="cancelTotpSetup"
-            >
-              Cancel
-            </Button>
-            <p
-              v-if="totpError"
-              class="text-sm text-destructive mt-2"
-            >
+            <Button variant="ghost" size="sm" @click="cancelTotpSetup"> Cancel </Button>
+            <p v-if="totpError" class="text-sm text-destructive mt-2">
               {{ totpError }}
             </p>
           </div>
 
           <!-- Enabled state -->
-          <div
-            v-else-if="totpEnabled"
-            class="flex gap-3"
-          >
-            <Button
-              variant="destructive"
-              :loading="totpLoading"
-              @click="disableTotp"
-            >
+          <div v-else-if="totpEnabled" class="flex gap-3">
+            <Button variant="destructive" :loading="totpLoading" @click="disableTotp">
               Disable TOTP
             </Button>
           </div>
 
           <!-- Disabled state -->
           <div v-else>
-            <Button @click="initTotpSetup">
-              Set Up TOTP
-            </Button>
-            <p
-              v-if="totpError"
-              class="text-sm text-destructive mt-2"
-            >
+            <Button @click="initTotpSetup"> Set Up TOTP </Button>
+            <p v-if="totpError" class="text-sm text-destructive mt-2">
               {{ totpError }}
             </p>
           </div>
@@ -356,18 +319,13 @@ async function handleChangePassword() {
 
         <!-- Passkeys -->
         <Card>
-          <h2 class="text-lg font-semibold mb-4">
-            Passkeys
-          </h2>
+          <h2 class="text-lg font-semibold mb-4">Passkeys</h2>
           <p class="text-sm text-muted-foreground mb-4">
             Register a hardware security key or biometric authenticator to sign in without a
             password.
           </p>
 
-          <div
-            v-if="passkeys.length > 0"
-            class="space-y-2 mb-4"
-          >
+          <div v-if="passkeys.length > 0" class="space-y-2 mb-4">
             <div
               v-for="pk in passkeys"
               :key="pk.id"
@@ -377,9 +335,7 @@ async function handleChangePassword() {
                 <p class="text-sm font-medium">
                   {{ pk.name }}
                 </p>
-                <p class="text-xs text-muted-foreground">
-                  Added {{ formatDate(pk.createdAt) }}
-                </p>
+                <p class="text-xs text-muted-foreground">Added {{ formatDate(pk.createdAt) }}</p>
               </div>
               <Button
                 variant="ghost"
@@ -392,12 +348,7 @@ async function handleChangePassword() {
             </div>
           </div>
 
-          <Button
-            :loading="passkeyLoading"
-            @click="registerPasskey"
-          >
-            Register Passkey
-          </Button>
+          <Button :loading="passkeyLoading" @click="registerPasskey"> Register Passkey </Button>
           <p
             v-if="passkeyStatus"
             class="text-sm mt-2"
@@ -413,21 +364,13 @@ async function handleChangePassword() {
 
         <!-- Change Password -->
         <Card>
-          <h2 class="text-lg font-semibold mb-4">
-            Change Password
-          </h2>
+          <h2 class="text-lg font-semibold mb-4">Change Password</h2>
 
-          <div
-            v-if="passwordSuccess"
-            class="text-sm text-green-600 dark:text-green-400 mb-4"
-          >
+          <div v-if="passwordSuccess" class="text-sm text-green-600 dark:text-green-400 mb-4">
             {{ passwordSuccess }}
           </div>
 
-          <form
-            class="space-y-4"
-            @submit.prevent="handleChangePassword"
-          >
+          <form class="space-y-4" @submit.prevent="handleChangePassword">
             <div>
               <label class="text-sm font-medium mb-1.5 block">Current Password</label>
               <Input
@@ -455,18 +398,10 @@ async function handleChangePassword() {
                 autocomplete="new-password"
               />
             </div>
-            <p
-              v-if="passwordError"
-              class="text-sm text-destructive"
-            >
+            <p v-if="passwordError" class="text-sm text-destructive">
               {{ passwordError }}
             </p>
-            <Button
-              :loading="passwordLoading"
-              class="w-full"
-            >
-              Update Password
-            </Button>
+            <Button :loading="passwordLoading" class="w-full"> Update Password </Button>
           </form>
         </Card>
       </div>
@@ -474,37 +409,21 @@ async function handleChangePassword() {
       <!-- Session manager (second column on large screens) -->
       <div class="lg:max-w-md">
         <Card>
-          <h2 class="text-lg font-semibold mb-4">
-            Active Sessions
-          </h2>
+          <h2 class="text-lg font-semibold mb-4">Active Sessions</h2>
           <p class="text-sm text-muted-foreground mb-4">
             Devices or browsers where you are logged in. Revoke any session to log it out. Your
             current session is marked.
           </p>
 
-          <p
-            v-if="sessionsError"
-            class="text-sm text-destructive mb-4"
-          >
+          <p v-if="sessionsError" class="text-sm text-destructive mb-4">
             {{ sessionsError }}
           </p>
 
-          <div
-            v-if="sessionsLoading"
-            class="text-sm text-muted-foreground"
-          >
-            Loading…
-          </div>
-          <div
-            v-else-if="sessions.length === 0"
-            class="text-sm text-muted-foreground"
-          >
+          <div v-if="sessionsLoading" class="text-sm text-muted-foreground">Loading…</div>
+          <div v-else-if="sessions.length === 0" class="text-sm text-muted-foreground">
             No sessions found.
           </div>
-          <div
-            v-else
-            class="space-y-3 mb-4"
-          >
+          <div v-else class="space-y-3 mb-4">
             <div
               v-for="session in sessions"
               :key="session.id"
@@ -513,11 +432,7 @@ async function handleChangePassword() {
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium flex items-center gap-2">
                   {{ sessionLabel(session) }}
-                  <Badge
-                    v-if="session.current"
-                    variant="secondary"
-                    class="shrink-0"
-                  >
+                  <Badge v-if="session.current" variant="secondary" class="shrink-0">
                     This device
                   </Badge>
                 </p>

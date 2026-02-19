@@ -28,5 +28,5 @@ defineEmits<{ 'update:modelValue': [value: string] }>();
       )
     "
     @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-  >
+  />
 </template>

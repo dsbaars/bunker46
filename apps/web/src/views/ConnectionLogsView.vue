@@ -66,22 +66,12 @@ function resultVariant(result: string) {
       </button>
     </div>
 
-    <h1 class="text-2xl font-bold mb-6">
-      Signing Logs
-    </h1>
+    <h1 class="text-2xl font-bold mb-6">Signing Logs</h1>
 
     <Card>
-      <div
-        v-if="loading"
-        class="text-muted-foreground"
-      >
-        Loading logs...
-      </div>
+      <div v-if="loading" class="text-muted-foreground">Loading logs...</div>
 
-      <div
-        v-else-if="logs.length === 0"
-        class="text-center py-8 text-muted-foreground"
-      >
+      <div v-else-if="logs.length === 0" class="text-center py-8 text-muted-foreground">
         No logs yet. Enable logging on this connection to start recording.
       </div>
 
@@ -90,29 +80,15 @@ function resultVariant(result: string) {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-border text-muted-foreground">
-                <th class="text-left py-2 pr-4">
-                  Method
-                </th>
-                <th class="text-left py-2 pr-4">
-                  Kind
-                </th>
-                <th class="text-left py-2 pr-4">
-                  Result
-                </th>
-                <th class="text-left py-2 pr-4">
-                  Duration
-                </th>
-                <th class="text-left py-2">
-                  Time
-                </th>
+                <th class="text-left py-2 pr-4">Method</th>
+                <th class="text-left py-2 pr-4">Kind</th>
+                <th class="text-left py-2 pr-4">Result</th>
+                <th class="text-left py-2 pr-4">Duration</th>
+                <th class="text-left py-2">Time</th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="log in logs"
-                :key="log.id"
-                class="border-b border-border/50"
-              >
+              <tr v-for="log in logs" :key="log.id" class="border-b border-border/50">
                 <td class="py-2.5 pr-4 font-mono text-xs">
                   {{ log.method }}
                 </td>
@@ -124,9 +100,7 @@ function resultVariant(result: string) {
                     {{ log.result }}
                   </Badge>
                 </td>
-                <td class="py-2.5 pr-4 text-muted-foreground">
-                  {{ log.durationMs }}ms
-                </td>
+                <td class="py-2.5 pr-4 text-muted-foreground">{{ log.durationMs }}ms</td>
                 <td class="py-2.5 text-muted-foreground">
                   {{ formatDateTime(log.createdAt) }}
                 </td>

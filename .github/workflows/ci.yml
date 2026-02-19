@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        run: pnpm --filter @bunker46/shared-types --filter @bunker46/config run build
+
       - name: Run unit tests
         run: pnpm run test
 

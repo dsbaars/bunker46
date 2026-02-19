@@ -45,16 +45,9 @@ function resultBadgeVariant(result: string) {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold mb-6">
-      Dashboard
-    </h1>
+    <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
 
-    <div
-      v-if="loading"
-      class="text-muted-foreground"
-    >
-      Loading statistics...
-    </div>
+    <div v-if="loading" class="text-muted-foreground">Loading statistics...</div>
 
     <template v-else-if="stats">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -99,19 +92,14 @@ function resultBadgeVariant(result: string) {
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <h2 class="text-lg font-semibold mb-4">
-            Signing by Method
-          </h2>
+          <h2 class="text-lg font-semibold mb-4">Signing by Method</h2>
           <div
             v-if="Object.keys(stats.signingByMethod).length === 0"
             class="text-sm text-muted-foreground"
           >
             No signing activity yet
           </div>
-          <div
-            v-else
-            class="space-y-3"
-          >
+          <div v-else class="space-y-3">
             <div
               v-for="(count, method) in stats.signingByMethod"
               :key="method"
@@ -124,19 +112,14 @@ function resultBadgeVariant(result: string) {
         </Card>
 
         <Card>
-          <h2 class="text-lg font-semibold mb-4">
-            Signing by Event Kind
-          </h2>
+          <h2 class="text-lg font-semibold mb-4">Signing by Event Kind</h2>
           <div
             v-if="Object.keys(stats.signingByKind).length === 0"
             class="text-sm text-muted-foreground"
           >
             No event signing yet
           </div>
-          <div
-            v-else
-            class="space-y-3"
-          >
+          <div v-else class="space-y-3">
             <div
               v-for="(count, kind) in stats.signingByKind"
               :key="kind"
@@ -150,34 +133,18 @@ function resultBadgeVariant(result: string) {
       </div>
 
       <Card class="mt-6">
-        <h2 class="text-lg font-semibold mb-4">
-          Recent Activity
-        </h2>
-        <div
-          v-if="stats.recentActivity.length === 0"
-          class="text-sm text-muted-foreground"
-        >
+        <h2 class="text-lg font-semibold mb-4">Recent Activity</h2>
+        <div v-if="stats.recentActivity.length === 0" class="text-sm text-muted-foreground">
           No recent activity
         </div>
-        <div
-          v-else
-          class="overflow-x-auto"
-        >
+        <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-border text-muted-foreground">
-                <th class="text-left py-2 pr-4">
-                  Connection
-                </th>
-                <th class="text-left py-2 pr-4">
-                  Method
-                </th>
-                <th class="text-left py-2 pr-4">
-                  Result
-                </th>
-                <th class="text-left py-2">
-                  Time
-                </th>
+                <th class="text-left py-2 pr-4">Connection</th>
+                <th class="text-left py-2 pr-4">Method</th>
+                <th class="text-left py-2 pr-4">Result</th>
+                <th class="text-left py-2">Time</th>
               </tr>
             </thead>
             <tbody>
@@ -208,9 +175,7 @@ function resultBadgeVariant(result: string) {
     </template>
 
     <Card v-else>
-      <p class="text-muted-foreground">
-        Failed to load dashboard statistics.
-      </p>
+      <p class="text-muted-foreground">Failed to load dashboard statistics.</p>
     </Card>
   </div>
 </template>

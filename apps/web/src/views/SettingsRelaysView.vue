@@ -76,25 +76,13 @@ async function saveRelays() {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold mb-6">
-      Relay Configuration
-    </h1>
+    <h1 class="text-2xl font-bold mb-6">Relay Configuration</h1>
 
-    <div
-      v-if="loading"
-      class="text-muted-foreground"
-    >
-      Loading...
-    </div>
+    <div v-if="loading" class="text-muted-foreground">Loading...</div>
 
-    <div
-      v-else
-      class="space-y-6 max-w-2xl"
-    >
+    <div v-else class="space-y-6 max-w-2xl">
       <Card>
-        <h2 class="text-lg font-semibold mb-2">
-          Active Relays
-        </h2>
+        <h2 class="text-lg font-semibold mb-2">Active Relays</h2>
         <p class="text-sm text-muted-foreground mb-4">
           These relays are used when generating <code class="text-primary">bunker://</code> URIs and
           listening for NIP-46 signing requests. Changes take effect after saving.
@@ -107,10 +95,7 @@ async function saveRelays() {
           No relays configured. Default relays will be used.
         </div>
 
-        <div
-          v-else
-          class="space-y-2 mb-4"
-        >
+        <div v-else class="space-y-2 mb-4">
           <div
             v-for="relay in relays"
             :key="relay"
@@ -118,11 +103,7 @@ async function saveRelays() {
           >
             <span class="text-sm font-mono truncate mr-3">{{ relay }}</span>
             <div class="flex items-center gap-2 shrink-0">
-              <Badge
-                v-if="defaults.includes(relay)"
-                variant="secondary"
-                class="text-xs"
-              >
+              <Badge v-if="defaults.includes(relay)" variant="secondary" class="text-xs">
                 default
               </Badge>
               <button
@@ -142,41 +123,23 @@ async function saveRelays() {
             class="flex-1 font-mono text-sm"
             @keyup.enter="addRelay"
           />
-          <Button
-            :disabled="!newRelay.trim()"
-            @click="addRelay"
-          >
-            Add
-          </Button>
+          <Button :disabled="!newRelay.trim()" @click="addRelay"> Add </Button>
         </div>
 
-        <p
-          v-if="error"
-          class="text-sm text-destructive mb-4"
-        >
+        <p v-if="error" class="text-sm text-destructive mb-4">
           {{ error }}
         </p>
 
         <div class="flex items-center gap-3">
-          <Button
-            :loading="saving"
-            @click="saveRelays"
-          >
+          <Button :loading="saving" @click="saveRelays">
             {{ saved ? 'Saved!' : 'Save Relays' }}
           </Button>
-          <Button
-            variant="ghost"
-            @click="resetToDefaults"
-          >
-            Reset to Defaults
-          </Button>
+          <Button variant="ghost" @click="resetToDefaults"> Reset to Defaults </Button>
         </div>
       </Card>
 
       <Card>
-        <h2 class="text-lg font-semibold mb-2">
-          Default Relays
-        </h2>
+        <h2 class="text-lg font-semibold mb-2">Default Relays</h2>
         <p class="text-sm text-muted-foreground mb-3">
           These are the built-in default relays used when no custom relays are configured.
         </p>

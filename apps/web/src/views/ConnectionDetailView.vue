@@ -153,12 +153,7 @@ function formatTime(ts: string) {
 </script>
 
 <template>
-  <div
-    v-if="loading"
-    class="text-muted-foreground"
-  >
-    Loading...
-  </div>
+  <div v-if="loading" class="text-muted-foreground">Loading...</div>
 
   <div v-else-if="connection">
     <div class="flex items-center gap-3 mb-6">
@@ -175,11 +170,7 @@ function formatTime(ts: string) {
         v-if="connection.logoUrl"
         class="w-16 h-16 rounded-xl bg-muted overflow-hidden flex-shrink-0"
       >
-        <img
-          :src="connection.logoUrl"
-          :alt="connection.name"
-          class="w-full h-full object-cover"
-        >
+        <img :src="connection.logoUrl" :alt="connection.name" class="w-full h-full object-cover" />
       </div>
       <div
         v-else
@@ -207,10 +198,7 @@ function formatTime(ts: string) {
             connection.nsecKey?.publicKey?.slice(0, 16)
           }}...)
         </p>
-        <p
-          v-if="connection.lastActivity"
-          class="text-xs text-muted-foreground mt-1"
-        >
+        <p v-if="connection.lastActivity" class="text-xs text-muted-foreground mt-1">
           Last activity: {{ formatTime(connection.lastActivity) }}
         </p>
       </div>
@@ -220,9 +208,7 @@ function formatTime(ts: string) {
       <!-- Permissions -->
       <Card>
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold">
-            Permissions
-          </h2>
+          <h2 class="text-lg font-semibold">Permissions</h2>
           <div class="flex gap-2">
             <button
               v-if="!isUnrestricted"
@@ -245,22 +231,15 @@ function formatTime(ts: string) {
           v-if="isUnrestricted"
           class="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30"
         >
-          <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
-            Unrestricted
-          </p>
+          <p class="text-sm font-medium text-amber-600 dark:text-amber-400">Unrestricted</p>
           <p class="text-xs text-muted-foreground mt-1">
             No permission whitelist configured. All NIP-46 methods are allowed. Click "Restrict to
             whitelist" to only allow specific methods.
           </p>
         </div>
 
-        <div
-          v-else
-          class="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30"
-        >
-          <p class="text-sm font-medium text-blue-600 dark:text-blue-400">
-            Whitelist mode
-          </p>
+        <div v-else class="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+          <p class="text-sm font-medium text-blue-600 dark:text-blue-400">Whitelist mode</p>
           <p class="text-xs text-muted-foreground mt-1">
             Only explicitly enabled methods are allowed. Toggle individual methods below.
           </p>
@@ -274,13 +253,7 @@ function formatTime(ts: string) {
           >
             <div class="flex items-center gap-2">
               <span class="text-sm font-mono">{{ method }}</span>
-              <Badge
-                v-if="isUnrestricted"
-                variant="secondary"
-                class="text-[10px]"
-              >
-                allowed
-              </Badge>
+              <Badge v-if="isUnrestricted" variant="secondary" class="text-[10px]"> allowed </Badge>
             </div>
             <button
               v-if="!isUnrestricted"
@@ -305,9 +278,7 @@ function formatTime(ts: string) {
         <!-- Activity summary -->
         <Card>
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold">
-              Recent Activity
-            </h2>
+            <h2 class="text-lg font-semibold">Recent Activity</h2>
             <button
               class="text-xs text-primary hover:underline cursor-pointer"
               @click="refreshLogs"
@@ -316,27 +287,17 @@ function formatTime(ts: string) {
             </button>
           </div>
 
-          <div
-            v-if="logs.length === 0"
-            class="text-sm text-muted-foreground"
-          >
+          <div v-if="logs.length === 0" class="text-sm text-muted-foreground">
             No activity recorded yet.
           </div>
 
           <div v-else>
-            <div
-              v-if="methodCounts.length > 0"
-              class="mb-4"
-            >
+            <div v-if="methodCounts.length > 0" class="mb-4">
               <p class="text-xs text-muted-foreground mb-2">
                 Methods used ({{ logs.length }} total requests):
               </p>
               <div class="flex flex-wrap gap-2">
-                <Badge
-                  v-for="[method, count] in methodCounts"
-                  :key="method"
-                  variant="secondary"
-                >
+                <Badge v-for="[method, count] in methodCounts" :key="method" variant="secondary">
                   {{ method }} × {{ count }}
                 </Badge>
               </div>
@@ -349,10 +310,7 @@ function formatTime(ts: string) {
                 class="flex items-center justify-between text-xs py-1.5 border-b border-border/30 last:border-0"
               >
                 <div class="flex items-center gap-2">
-                  <Badge
-                    :variant="resultVariant(log.result)"
-                    class="text-[10px]"
-                  >
+                  <Badge :variant="resultVariant(log.result)" class="text-[10px]">
                     {{ log.result }}
                   </Badge>
                   <span class="font-mono">
@@ -377,19 +335,11 @@ function formatTime(ts: string) {
 
         <!-- Relays -->
         <Card>
-          <h2 class="text-lg font-semibold mb-4">
-            Relays
-          </h2>
-          <div
-            v-if="connection.relays.length === 0"
-            class="text-sm text-muted-foreground"
-          >
+          <h2 class="text-lg font-semibold mb-4">Relays</h2>
+          <div v-if="connection.relays.length === 0" class="text-sm text-muted-foreground">
             Using default relays
           </div>
-          <div
-            v-else
-            class="space-y-1"
-          >
+          <div v-else class="space-y-1">
             <div
               v-for="relay in connection.relays"
               :key="relay"
@@ -402,15 +352,11 @@ function formatTime(ts: string) {
 
         <!-- Options -->
         <Card>
-          <h2 class="text-lg font-semibold mb-4">
-            Options
-          </h2>
+          <h2 class="text-lg font-semibold mb-4">Options</h2>
           <div class="space-y-4">
             <div class="flex items-center justify-between">
               <div>
-                <div class="font-medium text-sm">
-                  Detailed Logging
-                </div>
+                <div class="font-medium text-sm">Detailed Logging</div>
                 <div class="text-xs text-muted-foreground">
                   Log all RPC calls for this connection
                 </div>
@@ -435,9 +381,7 @@ function formatTime(ts: string) {
 
         <!-- Danger -->
         <Card>
-          <h2 class="text-lg font-semibold mb-4">
-            Danger Zone
-          </h2>
+          <h2 class="text-lg font-semibold mb-4">Danger Zone</h2>
           <div class="space-y-3">
             <Button
               v-if="connection.status === 'ACTIVE'"
@@ -455,11 +399,7 @@ function formatTime(ts: string) {
             >
               Reactivate Connection
             </Button>
-            <Button
-              variant="destructive"
-              class="w-full"
-              @click="deleteConnection"
-            >
+            <Button variant="destructive" class="w-full" @click="deleteConnection">
               Delete Connection
             </Button>
           </div>

@@ -136,27 +136,16 @@ async function handlePasskeyLogin() {
         src="/logo.png"
         alt="Bunker46"
         class="w-16 h-16 rounded-2xl object-contain mx-auto mb-4"
-      >
-      <h1 class="text-2xl font-bold">
-        Welcome to Bunker46
-      </h1>
-      <p class="text-muted-foreground mt-2">
-        Sign in to manage your NIP-46 bunker
-      </p>
+      />
+      <h1 class="text-2xl font-bold">Welcome to Bunker46</h1>
+      <p class="text-muted-foreground mt-2">Sign in to manage your NIP-46 bunker</p>
     </div>
 
     <Card>
-      <form
-        class="space-y-4"
-        @submit.prevent="handleLogin"
-      >
+      <form class="space-y-4" @submit.prevent="handleLogin">
         <div>
           <label class="text-sm font-medium mb-1.5 block">Username</label>
-          <Input
-            v-model="username"
-            placeholder="Enter username"
-            autocomplete="username"
-          />
+          <Input v-model="username" placeholder="Enter username" autocomplete="username" />
         </div>
         <div>
           <label class="text-sm font-medium mb-1.5 block">Password</label>
@@ -167,18 +156,10 @@ async function handlePasskeyLogin() {
             autocomplete="current-password"
           />
         </div>
-        <p
-          v-if="error"
-          class="text-sm text-destructive"
-        >
+        <p v-if="error" class="text-sm text-destructive">
           {{ error }}
         </p>
-        <Button
-          :loading="loading"
-          class="w-full"
-        >
-          Sign In
-        </Button>
+        <Button :loading="loading" class="w-full"> Sign In </Button>
       </form>
 
       <div class="relative my-4">
@@ -206,40 +187,25 @@ async function handlePasskeyLogin() {
         >
           {{ showPasskeyForm ? 'Hide' : 'Use username instead' }}
         </button>
-        <div
-          v-if="showPasskeyForm"
-          class="flex gap-2 items-end"
-        >
+        <div v-if="showPasskeyForm" class="flex gap-2 items-end">
           <Input
             v-model="passkeyUsername"
             placeholder="Username (for older passkeys)"
             autocomplete="username"
             class="flex-1"
           />
-          <Button
-            variant="outline"
-            :loading="passkeyLoading"
-            @click="handlePasskeyLogin"
-          >
+          <Button variant="outline" :loading="passkeyLoading" @click="handlePasskeyLogin">
             Continue
           </Button>
         </div>
-        <p
-          v-if="passkeyError"
-          class="text-sm text-destructive"
-        >
+        <p v-if="passkeyError" class="text-sm text-destructive">
           {{ passkeyError }}
         </p>
       </div>
 
       <div class="mt-4 text-center text-sm text-muted-foreground">
         Don't have an account?
-        <router-link
-          to="/register"
-          class="text-primary hover:underline"
-        >
-          Register
-        </router-link>
+        <router-link to="/register" class="text-primary hover:underline"> Register </router-link>
       </div>
     </Card>
   </div>

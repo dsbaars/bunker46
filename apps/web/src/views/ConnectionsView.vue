@@ -206,114 +206,62 @@ function statusVariant(status: string) {
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold">
-        Connections
-      </h1>
-      <div
-        v-if="mode === 'idle'"
-        class="flex gap-2"
-      >
+      <h1 class="text-2xl font-bold">Connections</h1>
+      <div v-if="mode === 'idle'" class="flex gap-2">
         <Button @click="enterMode('generate')">
           <KeyRound class="w-4 h-4 mr-2 shrink-0" />
           Generate bunker:// URI
         </Button>
-        <Button
-          variant="ghost"
-          @click="enterMode('import')"
-        >
+        <Button variant="ghost" @click="enterMode('import')">
           <Link2 class="w-4 h-4 mr-2 shrink-0" />
           Use Nostrconnect URI
         </Button>
       </div>
-      <Button
-        v-else
-        variant="ghost"
-        @click="reset"
-      >
-        Cancel
-      </Button>
+      <Button v-else variant="ghost" @click="reset"> Cancel </Button>
     </div>
 
     <!-- Generate bunker:// URI -->
-    <Card
-      v-if="mode === 'generate'"
-      class="mb-6"
-    >
-      <h2 class="text-lg font-semibold mb-2">
-        Generate bunker:// URI
-      </h2>
+    <Card v-if="mode === 'generate'" class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Generate bunker:// URI</h2>
       <p class="text-sm text-muted-foreground mb-4">
         Generate a URI and paste it into any NIP-46 compatible app (Primal, Amethyst, etc.) to allow
         it to use your key for signing.
       </p>
 
-      <div
-        v-if="!generatedUri"
-        class="space-y-4"
-      >
+      <div v-if="!generatedUri" class="space-y-4">
         <div>
           <label class="text-sm font-medium mb-1.5 block">Nsec Key</label>
           <select
             v-model="selectedKeyId"
             class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <option
-              value=""
-              disabled
-            >
-              Select a key...
-            </option>
-            <option
-              v-for="key in nsecKeys"
-              :key="key.id"
-              :value="key.id"
-            >
+            <option value="" disabled>Select a key...</option>
+            <option v-for="key in nsecKeys" :key="key.id" :value="key.id">
               {{ key.label }}{{ ui.defaultKeyId === key.id ? ' ★' : '' }}
             </option>
           </select>
         </div>
         <div>
           <label class="text-sm font-medium mb-1.5 block">Connection Name (optional)</label>
-          <Input
-            v-model="connectionName"
-            placeholder="e.g. Primal, Coracle..."
-          />
+          <Input v-model="connectionName" placeholder="e.g. Primal, Coracle..." />
         </div>
-        <p
-          v-if="nsecKeys.length === 0"
-          class="text-sm text-muted-foreground"
-        >
-          <router-link
-            to="/keys"
-            class="text-primary hover:underline"
-          >
+        <p v-if="nsecKeys.length === 0" class="text-sm text-muted-foreground">
+          <router-link to="/keys" class="text-primary hover:underline">
             Add an nsec key
           </router-link>
           first.
         </p>
-        <p
-          v-if="error"
-          class="text-sm text-destructive"
-        >
+        <p v-if="error" class="text-sm text-destructive">
           {{ error }}
         </p>
-        <Button
-          :loading="generating"
-          :disabled="!selectedKeyId"
-          @click="generateBunkerUri"
-        >
+        <Button :loading="generating" :disabled="!selectedKeyId" @click="generateBunkerUri">
           Generate URI
         </Button>
       </div>
 
-      <div
-        v-else
-        class="space-y-4"
-      >
+      <div v-else class="space-y-4">
         <div class="p-4 rounded-lg bg-muted/50 border border-border">
-          <p class="text-xs text-muted-foreground mb-2">
-            Copy this URI into your Nostr client:
-          </p>
+          <p class="text-xs text-muted-foreground mb-2">Copy this URI into your Nostr client:</p>
           <div
             class="font-mono text-sm break-all select-all bg-background rounded p-3 border border-border"
           >
@@ -324,12 +272,7 @@ function statusVariant(status: string) {
           <Button @click="copyUri">
             {{ copied ? 'Copied!' : 'Copy to Clipboard' }}
           </Button>
-          <Button
-            variant="ghost"
-            @click="generatedUri = ''"
-          >
-            Generate Another
-          </Button>
+          <Button variant="ghost" @click="generatedUri = ''"> Generate Another </Button>
         </div>
         <p class="text-xs text-muted-foreground">
           Waiting for client to connect... The connection will appear automatically once the client
@@ -345,24 +288,15 @@ function statusVariant(status: string) {
     </Card>
 
     <!-- Use Nostrconnect URI -->
-    <Card
-      v-if="mode === 'import'"
-      class="mb-6"
-    >
-      <h2 class="text-lg font-semibold mb-2">
-        Use Nostrconnect URI
-      </h2>
+    <Card v-if="mode === 'import'" class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Use Nostrconnect URI</h2>
       <p class="text-sm text-muted-foreground mb-4">
         Paste a <code class="text-primary">nostrconnect://</code> URI from a client app.
       </p>
       <div class="space-y-4">
         <div>
           <label class="text-sm font-medium mb-1.5 block">Nostrconnect URI</label>
-          <Input
-            v-model="bunkerUri"
-            placeholder="nostrconnect://..."
-            class="font-mono text-sm"
-          />
+          <Input v-model="bunkerUri" placeholder="nostrconnect://..." class="font-mono text-sm" />
         </div>
 
         <!-- Image preview extracted from URI -->
@@ -375,14 +309,12 @@ function statusVariant(status: string) {
             alt="App icon"
             class="w-12 h-12 rounded-lg object-contain bg-white"
             @error="uriPreviewImage = ''"
-          >
+          />
           <div>
             <p class="text-sm font-medium">
               {{ connectionName || 'Unknown App' }}
             </p>
-            <p class="text-xs text-muted-foreground">
-              Extracted from URI
-            </p>
+            <p class="text-xs text-muted-foreground">Extracted from URI</p>
           </div>
         </div>
 
@@ -392,32 +324,17 @@ function statusVariant(status: string) {
             v-model="selectedKeyId"
             class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <option
-              value=""
-              disabled
-            >
-              Select a key...
-            </option>
-            <option
-              v-for="key in nsecKeys"
-              :key="key.id"
-              :value="key.id"
-            >
+            <option value="" disabled>Select a key...</option>
+            <option v-for="key in nsecKeys" :key="key.id" :value="key.id">
               {{ key.label }}{{ ui.defaultKeyId === key.id ? ' ★' : '' }}
             </option>
           </select>
         </div>
         <div>
           <label class="text-sm font-medium mb-1.5 block">Connection Name</label>
-          <Input
-            v-model="connectionName"
-            placeholder="e.g. My App"
-          />
+          <Input v-model="connectionName" placeholder="e.g. My App" />
         </div>
-        <p
-          v-if="error"
-          class="text-sm text-destructive"
-        >
+        <p v-if="error" class="text-sm text-destructive">
           {{ error }}
         </p>
         <Button
@@ -431,24 +348,14 @@ function statusVariant(status: string) {
     </Card>
 
     <!-- Loading -->
-    <div
-      v-if="loading"
-      class="text-muted-foreground"
-    >
-      Loading connections...
-    </div>
+    <div v-if="loading" class="text-muted-foreground">Loading connections...</div>
 
     <!-- Empty state -->
-    <div
-      v-else-if="connections.length === 0 && mode === 'idle'"
-      class="text-center py-12"
-    >
+    <div v-else-if="connections.length === 0 && mode === 'idle'" class="text-center py-12">
       <div class="flex justify-center mb-4">
         <Plug class="w-12 h-12 text-muted-foreground" />
       </div>
-      <p class="text-muted-foreground mb-2">
-        No connections yet
-      </p>
+      <p class="text-muted-foreground mb-2">No connections yet</p>
       <p class="text-sm text-muted-foreground mb-4">
         Generate a <code class="text-primary">bunker://</code> URI and paste it into a Nostr client
         to get started.
@@ -473,15 +380,8 @@ function statusVariant(status: string) {
         @click="router.push(`/connections/${conn.id}`)"
       >
         <div class="flex items-start gap-3">
-          <div
-            v-if="conn.logoUrl"
-            class="w-10 h-10 rounded-lg bg-muted shrink-0 overflow-hidden"
-          >
-            <img
-              :src="conn.logoUrl"
-              :alt="conn.name"
-              class="w-full h-full object-cover"
-            >
+          <div v-if="conn.logoUrl" class="w-10 h-10 rounded-lg bg-muted shrink-0 overflow-hidden">
+            <img :src="conn.logoUrl" :alt="conn.name" class="w-full h-full object-cover" />
           </div>
           <div
             v-else
@@ -511,14 +411,8 @@ function statusVariant(status: string) {
                     : ''
                 "
               >
-                <Unlock
-                  v-if="conn.permissions.length === 0"
-                  class="w-3.5 h-3.5 shrink-0"
-                />
-                <Lock
-                  v-else
-                  class="w-3.5 h-3.5 shrink-0"
-                />
+                <Unlock v-if="conn.permissions.length === 0" class="w-3.5 h-3.5 shrink-0" />
+                <Lock v-else class="w-3.5 h-3.5 shrink-0" />
                 {{
                   conn.permissions.length === 0
                     ? 'Unrestricted'

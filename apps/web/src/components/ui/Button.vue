@@ -38,24 +38,9 @@ const classes = computed(() =>
 </script>
 
 <template>
-  <button
-    :class="classes"
-    :disabled="disabled || loading"
-  >
-    <svg
-      v-if="loading"
-      class="mr-2 h-4 w-4 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle
-        class="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        stroke-width="4"
-      />
+  <button :class="classes" :disabled="disabled || loading">
+    <svg v-if="loading" class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
       <path
         class="opacity-75"
         fill="currentColor"

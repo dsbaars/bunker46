@@ -39,19 +39,12 @@ async function handleVerify() {
 <template>
   <div class="w-full max-w-md mx-auto">
     <div class="text-center mb-8">
-      <h1 class="text-2xl font-bold">
-        Two-Factor Authentication
-      </h1>
-      <p class="text-muted-foreground mt-2">
-        Enter the 6-digit code from your authenticator app
-      </p>
+      <h1 class="text-2xl font-bold">Two-Factor Authentication</h1>
+      <p class="text-muted-foreground mt-2">Enter the 6-digit code from your authenticator app</p>
     </div>
 
     <Card>
-      <form
-        class="space-y-4"
-        @submit.prevent="handleVerify"
-      >
+      <form class="space-y-4" @submit.prevent="handleVerify">
         <div>
           <label class="text-sm font-medium mb-1.5 block">TOTP Code</label>
           <Input
@@ -62,18 +55,10 @@ async function handleVerify() {
             autocomplete="one-time-code"
           />
         </div>
-        <p
-          v-if="error"
-          class="text-sm text-destructive"
-        >
+        <p v-if="error" class="text-sm text-destructive">
           {{ error }}
         </p>
-        <Button
-          :loading="loading"
-          class="w-full"
-        >
-          Verify
-        </Button>
+        <Button :loading="loading" class="w-full"> Verify </Button>
       </form>
     </Card>
   </div>

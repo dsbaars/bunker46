@@ -122,21 +122,14 @@ function setDefault(id: string) {
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold">
-        Nsec Keys
-      </h1>
+      <h1 class="text-2xl font-bold">Nsec Keys</h1>
       <Button @click="showAddKey = !showAddKey">
         {{ showAddKey ? 'Cancel' : 'Add Key' }}
       </Button>
     </div>
 
-    <Card
-      v-if="showAddKey"
-      class="mb-6"
-    >
-      <h2 class="text-lg font-semibold mb-2">
-        Import Nsec Key
-      </h2>
+    <Card v-if="showAddKey" class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Import Nsec Key</h2>
       <p class="text-sm text-muted-foreground mb-4">
         Enter your nsec (bech32 <code class="text-primary">nsec1...</code> or 64-character hex). The
         key is encrypted at rest and never leaves the server.
@@ -153,56 +146,29 @@ function setDefault(id: string) {
         </div>
         <div>
           <label class="text-sm font-medium mb-1.5 block">Label</label>
-          <Input
-            v-model="labelInput"
-            placeholder="e.g. Main Identity, Bot Key..."
-          />
+          <Input v-model="labelInput" placeholder="e.g. Main Identity, Bot Key..." />
         </div>
-        <p
-          v-if="addError"
-          class="text-sm text-destructive"
-        >
+        <p v-if="addError" class="text-sm text-destructive">
           {{ addError }}
         </p>
-        <Button
-          :loading="adding"
-          @click="addKey"
-        >
-          Import Key
-        </Button>
+        <Button :loading="adding" @click="addKey"> Import Key </Button>
       </div>
     </Card>
 
-    <div
-      v-if="loading"
-      class="text-muted-foreground"
-    >
-      Loading keys...
-    </div>
+    <div v-if="loading" class="text-muted-foreground">Loading keys...</div>
 
-    <div
-      v-else-if="keys.length === 0"
-      class="text-center py-12"
-    >
+    <div v-else-if="keys.length === 0" class="text-center py-12">
       <div class="flex justify-center mb-4">
         <Key class="w-12 h-12 text-muted-foreground" />
       </div>
       <p class="text-muted-foreground mb-4">
         No nsec keys yet. Add one to start managing connections.
       </p>
-      <Button @click="showAddKey = true">
-        Add your first key
-      </Button>
+      <Button @click="showAddKey = true"> Add your first key </Button>
     </div>
 
-    <div
-      v-else
-      class="space-y-3"
-    >
-      <p
-        v-if="keys.length > 0"
-        class="text-xs text-muted-foreground mb-1"
-      >
+    <div v-else class="space-y-3">
+      <p v-if="keys.length > 0" class="text-xs text-muted-foreground mb-1">
         Star a key to pre-select it when creating connections.
       </p>
       <Card
@@ -216,19 +182,12 @@ function setDefault(id: string) {
               <h3 class="font-semibold">
                 {{ key.label }}
               </h3>
-              <Badge
-                v-if="ui.defaultKeyId === key.id"
-                variant="default"
-              >
-                Default
-              </Badge>
+              <Badge v-if="ui.defaultKeyId === key.id" variant="default"> Default </Badge>
             </div>
             <p class="text-xs text-muted-foreground font-mono truncate">
               {{ npubs[key.id] || key.publicKey }}
             </p>
-            <p class="text-xs text-muted-foreground mt-1">
-              Added {{ formatDate(key.createdAt) }}
-            </p>
+            <p class="text-xs text-muted-foreground mt-1">Added {{ formatDate(key.createdAt) }}</p>
           </div>
           <div class="flex items-center gap-2 shrink-0">
             <button
