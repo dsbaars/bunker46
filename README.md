@@ -1,6 +1,25 @@
 # Bunker46
 
+[![CI](https://github.com/dsbaars/bunker46/actions/workflows/ci.yml/badge.svg)](https://github.com/dsbaars/bunker46/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+[![Vue](https://img.shields.io/badge/Vue-3.5-brightgreen)](https://vuejs.org/)
+[![Node](https://img.shields.io/badge/Node-24+-green)](https://nodejs.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-10+-orange)](https://pnpm.io/)
+[![License](https://img.shields.io/github/license/dsbaars/bunker46)](LICENSE)
+
 A modern, secure NIP-46 Nsec Bunker management tool built with TypeScript.
+
+## Screenshots
+
+| Login                                                                | Dashboard                                                                        |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [![Login](docs/screenshots/login.webp)](docs/screenshots/login.webp) | [![Dashboard](docs/screenshots/dashboard.webp)](docs/screenshots/dashboard.webp) |
+
+| Connections                                                                            | Keys                                                              |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [![Connections](docs/screenshots/connections.webp)](docs/screenshots/connections.webp) | [![Keys](docs/screenshots/keys.webp)](docs/screenshots/keys.webp) |
+
+Screenshots are captured with Playwright (WebP). The connections screenshot uses mocked API data. To regenerate: run `pnpm dev` in one terminal, then `pnpm run e2e:screenshots`.
 
 ## Stack
 
@@ -110,8 +129,6 @@ pnpm lint
 # Security-specific lint
 pnpm lint:security
 ```
-
-For test coverage completeness and gap analysis, see [docs/TEST_COVERAGE.md](docs/TEST_COVERAGE.md).
 
 ### Production (Docker)
 

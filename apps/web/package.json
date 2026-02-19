@@ -14,6 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
+    "e2e:screenshots": "playwright test e2e/screenshots.spec.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
   "devDependencies": {
     "@bunker46/eslint-config": "workspace:*",
     "@bunker46/tsconfig": "workspace:*",
+    "sharp": "^0.33.5",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.2.0",
     "@types/node": "^25.0.0",

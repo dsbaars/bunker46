@@ -1,0 +1,128 @@
+[
+  {
+    "id": "cmlu04d630000qyss8iwve9aq",
+    "userId": "cmltm5dv20003ssjxk3e1s4mt",
+    "nsecKeyId": "cmltmjbw00001ss8rjlsz32ky",
+    "clientPubkey": "9bab10fda6031ac9f837892e120119ad25c08fa9e8dd3319b693ff666ed65820",
+    "remotePubkey": null,
+    "name": "Satsback.com",
+    "logoUrl": "https://satsback.com/assets/media/meta/favicon.png",
+    "status": "ACTIVE",
+    "relays": ["wss://relay.nsec.app", "wss://relay.damus.io", "wss://relay.primal.net"],
+    "secret": "f32a3f6a071c8a82d9ca7c5581ea2592",
+    "loggingEnabled": false,
+    "lastActivity": "2026-02-19T21:57:20.107Z",
+    "createdAt": "2026-02-19T21:57:08.137Z",
+    "updatedAt": "2026-02-19T21:57:20.107Z",
+    "permissions": [
+      {
+        "id": "cmlu04d6e0001qyss6ofxw8v9",
+        "connectionId": "cmlu04d630000qyss8iwve9aq",
+        "method": "sign_event",
+        "kind": 27235,
+        "allowed": true
+      }
+    ],
+    "nsecKey": {
+      "publicKey": "27b256db6e19c0245f3b9b62c5a2bfd9a90964bd1bc6d20b56107c78203010d0",
+      "label": "Test"
+    },
+    "_count": { "logs": 5 }
+  },
+  {
+    "id": "cmltt4g9d0003ssy1n19x7jst",
+    "userId": "cmltm5dv20003ssjxk3e1s4mt",
+    "nsecKeyId": "cmltmjbw00001ss8rjlsz32ky",
+    "clientPubkey": "4455813200a3829e4b7370d0c59b48e53d307401c77a6d5872b52cdbe7872e2d",
+    "remotePubkey": null,
+    "name": "Satsback.com",
+    "logoUrl": "https://satsback.com/assets/media/meta/favicon.png",
+    "status": "ACTIVE",
+    "relays": ["wss://relay.nsec.app", "wss://relay.damus.io", "wss://relay.primal.net"],
+    "secret": "79c27aa7b5eb21f463fd504fb0f5bca8",
+    "loggingEnabled": false,
+    "lastActivity": "2026-02-19T19:02:06.334Z",
+    "createdAt": "2026-02-19T18:41:14.834Z",
+    "updatedAt": "2026-02-19T19:02:06.335Z",
+    "permissions": [
+      {
+        "id": "cmltt4g9p0004ssy1ureha4tb",
+        "connectionId": "cmltt4g9d0003ssy1n19x7jst",
+        "method": "sign_event",
+        "kind": 27235,
+        "allowed": true
+      }
+    ],
+    "nsecKey": {
+      "publicKey": "27b256db6e19c0245f3b9b62c5a2bfd9a90964bd1bc6d20b56107c78203010d0",
+      "label": "Test"
+    },
+    "_count": { "logs": 68 }
+  },
+  {
+    "id": "cmltqkm460007sscn5v2yu0ny",
+    "userId": "cmltm5dv20003ssjxk3e1s4mt",
+    "nsecKeyId": "cmltmjbw00001ss8rjlsz32ky",
+    "clientPubkey": "396766ad2d037813c308a2ec68a1e619073ea53d441946ba86626b0ec771ffa2",
+    "remotePubkey": null,
+    "name": "PrimalWeb",
+    "logoUrl": "https://primal.net/assets/logo_fire_roster-7e6e512c.png",
+    "status": "ACTIVE",
+    "relays": ["wss://relay.primal.net"],
+    "secret": "sec-f325c057-3de5-401f-9c64-36c8bb62b043",
+    "loggingEnabled": false,
+    "lastActivity": "2026-02-19T17:37:44.258Z",
+    "createdAt": "2026-02-19T17:29:50.069Z",
+    "updatedAt": "2026-02-19T17:37:44.259Z",
+    "permissions": [],
+    "nsecKey": {
+      "publicKey": "27b256db6e19c0245f3b9b62c5a2bfd9a90964bd1bc6d20b56107c78203010d0",
+      "label": "Test"
+    },
+    "_count": { "logs": 19 }
+  },
+  {
+    "id": "cmltqqgaq001msscn818j7g5s",
+    "userId": "cmltm5dv20003ssjxk3e1s4mt",
+    "nsecKeyId": "cmltmjbw00001ss8rjlsz32ky",
+    "clientPubkey": "f607219e9f1c6ae37710a94192c7098b85cefd7d7004c8a81cff06eb597b0926",
+    "remotePubkey": null,
+    "name": "Coracle",
+    "logoUrl": null,
+    "status": "ACTIVE",
+    "relays": [],
+    "secret": "9f801533f81c0e3da8866e7a72eb92ab",
+    "loggingEnabled": true,
+    "lastActivity": "2026-02-19T17:36:08.332Z",
+    "createdAt": "2026-02-19T17:34:22.466Z",
+    "updatedAt": "2026-02-19T17:36:08.333Z",
+    "permissions": [],
+    "nsecKey": {
+      "publicKey": "27b256db6e19c0245f3b9b62c5a2bfd9a90964bd1bc6d20b56107c78203010d0",
+      "label": "Test"
+    },
+    "_count": { "logs": 18 }
+  },
+  {
+    "id": "cmltqn769000nsscnyrj6wox2",
+    "userId": "cmltm5dv20003ssjxk3e1s4mt",
+    "nsecKeyId": "cmltmjbw00001ss8rjlsz32ky",
+    "clientPubkey": "d3bc7a7518326058be99ec4dfeff126fb31f9e56baf2f82cd03d71555857dfb9",
+    "remotePubkey": null,
+    "name": "noStrudel",
+    "logoUrl": "https://nostrudel.ninja/apple-touch-icon.png",
+    "status": "ACTIVE",
+    "relays": ["wss://relay.nsec.app/"],
+    "secret": "xMCt7Va1Os6L",
+    "loggingEnabled": false,
+    "lastActivity": null,
+    "createdAt": "2026-02-19T17:31:50.673Z",
+    "updatedAt": "2026-02-19T17:31:50.799Z",
+    "permissions": [],
+    "nsecKey": {
+      "publicKey": "27b256db6e19c0245f3b9b62c5a2bfd9a90964bd1bc6d20b56107c78203010d0",
+      "label": "Test"
+    },
+    "_count": { "logs": 0 }
+  }
+]

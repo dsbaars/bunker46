@@ -23,6 +23,7 @@
     "test:coverage": "pnpm -r run test:coverage",
     "e2e": "pnpm --filter @bunker46/web run e2e",
     "e2e:ui": "pnpm --filter @bunker46/web run e2e:ui",
+    "e2e:screenshots": "pnpm --filter @bunker46/web run e2e:screenshots",
     "db:migrate": "pnpm --filter @bunker46/server run db:migrate",
     "db:generate": "pnpm --filter @bunker46/server run db:generate",
     "db:push": "pnpm --filter @bunker46/server run db:push",
