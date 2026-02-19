@@ -26,4 +26,19 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const auth = req.headers['authorization'];
+            if (auth) proxyReq.setHeader('Authorization', auth);
+          });
+        },
+      },
+    },
+  },
 });

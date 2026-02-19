@@ -104,6 +104,8 @@ jobs:
           - 5432:5432
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bunker46
+      JWT_SECRET: ci-jwt-secret-min-32-chars-long-for-e2e
+      ENCRYPTION_KEY: ci-encryption-key-min-32-chars-for-e2e
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -125,10 +127,33 @@ jobs:
       - name: Push database schema
         run: pnpm --filter @bunker46/server run db:push
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-1.58.2
+
       - name: Install Playwright browsers (Chromium)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium --with-deps
 
+      - name: Install Playwright system deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Build for E2E
+        run: pnpm run build
+
       - name: Run E2E tests
-        run: pnpm run e2e
+        run: |
+          pnpm --filter @bunker46/server run start &
+          echo "Waiting for API on port 3000..."
+          for i in $(seq 1 60); do
+            curl -s -o /dev/null http://127.0.0.1:3000 && break
+            sleep 1
+          done
+          pnpm run e2e
         env:
           CI: true
+          E2E_USE_PREVIEW: "1"

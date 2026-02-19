@@ -9,7 +9,7 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
-  retries: process.env['CI'] ? 2 : 0,
+  retries: process.env['CI'] ? 1 : 0,
   workers: process.env['CI'] ? 1 : undefined,
   reporter: 'html',
   use: {
@@ -27,12 +27,21 @@ export default defineConfig({
           { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
         ]
       : [{ name: 'chromium-desktop', use: { ...devices['Desktop Chrome'] } }],
-  // Full stack: start both NestJS (port 3000) and Vite (5173) from monorepo root so API works.
-  webServer: {
-    command: 'pnpm dev',
-    cwd: rootDir,
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env['CI'],
-    timeout: 60000,
-  },
+  // CI with E2E_USE_PREVIEW: server is started separately; only start Vite preview (faster than pnpm dev).
+  // Local: start full stack with pnpm dev.
+  webServer: process.env['E2E_USE_PREVIEW']
+    ? {
+        command: 'pnpm exec vite preview --port 5173',
+        cwd: __dirname,
+        url: 'http://localhost:5173',
+        reuseExistingServer: false,
+        timeout: 30000,
+      }
+    : {
+        command: 'pnpm dev',
+        cwd: rootDir,
+        url: 'http://localhost:5173',
+        reuseExistingServer: !process.env['CI'],
+        timeout: 60000,
+      },
 });
