@@ -34,6 +34,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^17.3.1",
+    "ioredis": "^5.7.0",
     "nostr-tools": "^2.12.0",
     "otplib": "^12.0.1",
     "passport": "^0.7.0",

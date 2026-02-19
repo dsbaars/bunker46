@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { Activity, Link2, PenLine, BarChart3 } from 'lucide-vue-next';
 import { api } from '@/lib/api';
 import { useFormatting } from '@/composables/useFormatting';
+import { useActivityStream } from '@/composables/useActivityStream';
 import type { DashboardStatsDto } from '@bunker46/shared-types';
 import StatCard from '@/components/ui/StatCard.vue';
 import Card from '@/components/ui/Card.vue';
@@ -12,7 +13,7 @@ const stats = ref<DashboardStatsDto | null>(null);
 const loading = ref(true);
 const { formatDateTime } = useFormatting();
 
-onMounted(async () => {
+async function loadStats() {
   try {
     stats.value = await api.get<DashboardStatsDto>('/dashboard/stats');
   } catch {
@@ -20,6 +21,14 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+}
+
+onMounted(() => {
+  loadStats();
+});
+
+useActivityStream(() => {
+  loadStats();
 });
 
 function resultBadgeVariant(result: string) {
@@ -52,6 +61,7 @@ function resultBadgeVariant(result: string) {
         <StatCard
           title="Active Sessions"
           :value="stats.activeSessions"
+          tooltip="Logged-in sessions (browsers or devices) that have not expired. Each login or token refresh can create a session; logging out removes it."
         >
           <template #icon>
             <Activity class="w-5 h-5 text-muted-foreground shrink-0" />
@@ -61,6 +71,7 @@ function resultBadgeVariant(result: string) {
           title="Active Connections"
           :value="stats.activeConnections"
           :description="`${stats.totalConnections} total`"
+          tooltip="NIP-46 clients (apps or bunkers) that have connected and are currently active. Total includes all connections (active, pending, or revoked)."
         >
           <template #icon>
             <Link2 class="w-5 h-5 text-muted-foreground shrink-0" />
@@ -69,6 +80,7 @@ function resultBadgeVariant(result: string) {
         <StatCard
           title="Actions (24h)"
           :value="stats.signingActions24h"
+          tooltip="Number of signing actions (e.g. sign_event, encrypt) performed by your connections in the last 24 hours."
         >
           <template #icon>
             <PenLine class="w-5 h-5 text-muted-foreground shrink-0" />
@@ -77,6 +89,7 @@ function resultBadgeVariant(result: string) {
         <StatCard
           title="Actions (7d)"
           :value="stats.signingActions7d"
+          tooltip="Number of signing actions performed by your connections in the last 7 days."
         >
           <template #icon>
             <BarChart3 class="w-5 h-5 text-muted-foreground shrink-0" />

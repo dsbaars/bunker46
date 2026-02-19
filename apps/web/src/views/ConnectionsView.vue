@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
+import { useActivityStream } from '@/composables/useActivityStream';
 import { useRouter } from 'vue-router';
 import { Link2, KeyRound, Plug, Lock, Unlock } from 'lucide-vue-next';
 import { api } from '@/lib/api';
@@ -12,7 +13,7 @@ import Input from '@/components/ui/Input.vue';
 
 const router = useRouter();
 const ui = useUiStore();
-const { formatDate } = useFormatting();
+const { formatDateTime } = useFormatting();
 
 interface Connection {
   id: string;
@@ -51,7 +52,7 @@ const bunkerUri = ref('');
 const uriPreviewImage = ref('');
 const creating = ref(false);
 
-onMounted(async () => {
+async function loadConnectionsAndKeys() {
   try {
     const [conns, keys] = await Promise.all([
       api.get<Connection[]>('/connections'),
@@ -59,7 +60,6 @@ onMounted(async () => {
     ]);
     connections.value = conns;
     nsecKeys.value = keys;
-    // pre-select default key
     if (ui.defaultKeyId && keys.some((k) => k.id === ui.defaultKeyId)) {
       selectedKeyId.value = ui.defaultKeyId;
     }
@@ -68,6 +68,14 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+}
+
+onMounted(() => {
+  loadConnectionsAndKeys();
+});
+
+useActivityStream(() => {
+  loadConnectionsAndKeys();
 });
 
 // Parse nostrconnect:// URI reactively to extract name + image
@@ -518,7 +526,7 @@ function statusVariant(status: string) {
                 }}
               </span>
               <span>{{ conn._count.logs }} logs</span>
-              <span v-if="conn.lastActivity"> Last: {{ formatDate(conn.lastActivity) }} </span>
+              <span v-if="conn.lastActivity"> Last: {{ formatDateTime(conn.lastActivity) }} </span>
             </div>
           </div>
         </div>

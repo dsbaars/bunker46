@@ -6,6 +6,7 @@ interface JwtPayload {
   sub: string;
   username: string;
   totpVerified: boolean;
+  sessionId?: string;
 }
 
 @Injectable()
@@ -19,6 +20,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload) {
-    return { sub: payload.sub, username: payload.username, totpVerified: payload.totpVerified };
+    return {
+      sub: payload.sub,
+      username: payload.username,
+      totpVerified: payload.totpVerified,
+      sessionId: payload.sessionId,
+    };
   }
 }

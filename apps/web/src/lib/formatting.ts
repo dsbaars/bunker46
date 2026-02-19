@@ -11,9 +11,18 @@ export function formatDate(iso: string, dateFormat: string): string {
 export function formatTime(iso: string, timeFormat: string): string {
   const d = new Date(iso);
   if (timeFormat === '24h') {
-    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   }
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
 }
 
 export function formatDateTime(iso: string, dateFormat: string, timeFormat: string): string {

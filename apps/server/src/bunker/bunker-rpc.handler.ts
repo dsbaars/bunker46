@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConnectionsService } from '../connections/connections.service.js';
 import { LoggingService } from '../logging/logging.service.js';
+import { EventsService } from '../events/events.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
 import {
   checkPermission,
@@ -22,6 +23,7 @@ export class BunkerRpcHandler {
   constructor(
     private readonly connections: ConnectionsService,
     private readonly loggingService: LoggingService,
+    private readonly eventsService: EventsService,
     private readonly encryption: EncryptionService,
   ) {}
 
@@ -238,6 +240,7 @@ export class BunkerRpcHandler {
       durationMs,
       errorMessage: error,
     });
+    await this.eventsService.publishUserActivity(connection.userId);
 
     return { id: request.id, result, error };
   }

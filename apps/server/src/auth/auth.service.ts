@@ -9,6 +9,7 @@ interface JwtPayload {
   sub: string;
   username: string;
   totpVerified: boolean;
+  sessionId?: string;
 }
 
 @Injectable()
@@ -20,17 +21,28 @@ export class AuthService {
     private readonly totpService: TotpService,
   ) {}
 
-  async register(username: string, password: string) {
+  async register(
+    username: string,
+    password: string,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
+  ) {
     const user = await this.usersService.create(username, password);
-    return this.createTokens(user.id, user.username, false);
+    return this.createTokens(user.id, user.username, false, sessionContext);
   }
 
-  async loginWithPasskey(userId: string) {
+  async loginWithPasskey(
+    userId: string,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
+  ) {
     const user = await this.usersService.findById(userId);
-    return this.createTokens(user.id, user.username, true);
+    return this.createTokens(user.id, user.username, true, sessionContext);
   }
 
-  async login(username: string, password: string) {
+  async login(
+    username: string,
+    password: string,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
+  ) {
     const user = await this.usersService.findByUsername(username);
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
@@ -47,10 +59,14 @@ export class AuthService {
       };
     }
 
-    return this.createTokens(user.id, user.username, true);
+    return this.createTokens(user.id, user.username, true, sessionContext);
   }
 
-  async verifyTotp(userId: string, code: string) {
+  async verifyTotp(
+    userId: string,
+    code: string,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
+  ) {
     const user = await this.usersService.findById(userId);
     if (!user.totpEnabled || !user.totpSecret) {
       throw new ForbiddenException('TOTP not enabled');
@@ -59,10 +75,13 @@ export class AuthService {
     const valid = this.totpService.verifyToken(user.totpSecret, code);
     if (!valid) throw new UnauthorizedException('Invalid TOTP code');
 
-    return this.createTokens(user.id, user.username, true);
+    return this.createTokens(user.id, user.username, true, sessionContext);
   }
 
-  async refreshTokens(refreshToken: string) {
+  async refreshTokens(
+    refreshToken: string,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
+  ) {
     const session = await this.prisma.session.findUnique({
       where: { refreshToken },
       include: { user: true },
@@ -73,29 +92,80 @@ export class AuthService {
     }
 
     await this.prisma.session.delete({ where: { id: session.id } });
-    return this.createTokens(session.user.id, session.user.username, session.totpVerified);
+    return this.createTokens(
+      session.user.id,
+      session.user.username,
+      session.totpVerified,
+      sessionContext,
+    );
   }
 
   async logout(refreshToken: string) {
     await this.prisma.session.deleteMany({ where: { refreshToken } });
   }
 
-  private async createTokens(userId: string, username: string, totpVerified: boolean) {
-    const payload: JwtPayload = { sub: userId, username, totpVerified };
-    const accessToken = await this.jwtService.signAsync(payload);
+  async listSessions(userId: string, currentSessionId?: string) {
+    const sessions = await this.prisma.session.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        userAgent: true,
+        ipAddress: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+    });
+    return sessions.map((s) => ({
+      id: s.id,
+      userAgent: s.userAgent ?? undefined,
+      ipAddress: s.ipAddress ?? undefined,
+      createdAt: s.createdAt.toISOString(),
+      expiresAt: s.expiresAt.toISOString(),
+      current: currentSessionId ? s.id === currentSessionId : false,
+    }));
+  }
 
+  async revokeSession(userId: string, sessionId: string) {
+    await this.prisma.session.deleteMany({
+      where: { id: sessionId, userId },
+    });
+  }
+
+  async revokeAllOtherSessions(userId: string, keepSessionId?: string) {
+    const where: { userId: string; id?: { not: string } } = { userId };
+    if (keepSessionId) where.id = { not: keepSessionId };
+    await this.prisma.session.deleteMany({ where });
+  }
+
+  private async createTokens(
+    userId: string,
+    username: string,
+    totpVerified: boolean,
+    sessionContext?: { ipAddress?: string; userAgent?: string },
+  ) {
     const refreshToken = randomBytes(48).toString('hex');
     const refreshExpiresIn = process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d';
     const days = parseInt(refreshExpiresIn) || 7;
 
-    await this.prisma.session.create({
+    const session = await this.prisma.session.create({
       data: {
         userId,
         refreshToken,
         expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
         totpVerified,
+        ipAddress: sessionContext?.ipAddress ?? null,
+        userAgent: sessionContext?.userAgent ?? null,
       },
     });
+
+    const payload: JwtPayload = {
+      sub: userId,
+      username,
+      totpVerified,
+      sessionId: session.id,
+    };
+    const accessToken = await this.jwtService.signAsync(payload);
 
     return { accessToken, refreshToken, requiresTotp: false };
   }

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
+import { EventsService } from '../events/events.service.js';
 import type { ConnectionStatus as PrismaConnectionStatus } from '@prisma/client';
 import type { PermissionDescriptor } from '@bunker46/shared-types';
 
@@ -9,6 +10,7 @@ export class ConnectionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
+    private readonly eventsService: EventsService,
   ) {}
 
   async addNsecKey(userId: string, nsecHex: string, publicKey: string, label: string) {
@@ -43,7 +45,7 @@ export class ConnectionsService {
       remotePubkey?: string;
     },
   ) {
-    return this.prisma.bunkerConnection.create({
+    const conn = await this.prisma.bunkerConnection.create({
       data: {
         userId,
         nsecKeyId,
@@ -57,6 +59,8 @@ export class ConnectionsService {
       },
       include: { permissions: true },
     });
+    await this.eventsService.publishUserActivity(userId);
+    return conn;
   }
 
   async listConnections(userId: string) {

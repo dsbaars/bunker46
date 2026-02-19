@@ -1,4 +1,14 @@
-import 'dotenv/config';
+import path from 'node:path';
+import { config } from 'dotenv';
+
+// Load repo root .env when running from apps/server (e.g. pnpm dev from root)
+const cwd = process.cwd();
+const serverRoot = cwd.endsWith('dist') ? path.resolve(cwd, '..') : cwd;
+if (serverRoot.endsWith('server')) {
+  config({ path: path.resolve(serverRoot, '../../.env') });
+}
+config(); // then cwd .env so local overrides win
+
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';

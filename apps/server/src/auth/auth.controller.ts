@@ -18,6 +18,17 @@ import { UsersService } from '../users/users.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import type { FastifyRequest } from 'fastify';
 
+function sessionContextFromRequest(req: FastifyRequest): {
+  ipAddress?: string;
+  userAgent?: string;
+} {
+  const ip =
+    typeof req.ip === 'string' ? req.ip : ((req as any).socket?.remoteAddress ?? undefined);
+  const userAgent =
+    typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined;
+  return { ipAddress: ip, userAgent };
+}
+
 @ApiTags('auth')
 @Controller('api/auth')
 export class AuthController {
@@ -29,14 +40,14 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  async register(@Body() body: { username: string; password: string }) {
-    return this.authService.register(body.username, body.password);
+  async register(@Req() req: FastifyRequest, @Body() body: { username: string; password: string }) {
+    return this.authService.register(body.username, body.password, sessionContextFromRequest(req));
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() body: { username: string; password: string }) {
-    return this.authService.login(body.username, body.password);
+  async login(@Req() req: FastifyRequest, @Body() body: { username: string; password: string }) {
+    return this.authService.login(body.username, body.password, sessionContextFromRequest(req));
   }
 
   @Post('totp/verify')
@@ -47,7 +58,7 @@ export class AuthController {
     @Req() req: FastifyRequest & { user: { sub: string } },
     @Body() body: { code: string },
   ) {
-    return this.authService.verifyTotp(req.user.sub, body.code);
+    return this.authService.verifyTotp(req.user.sub, body.code, sessionContextFromRequest(req));
   }
 
   @Post('totp/setup')
@@ -87,14 +98,44 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() body: { refreshToken: string }) {
-    return this.authService.refreshTokens(body.refreshToken);
+  async refresh(@Req() req: FastifyRequest, @Body() body: { refreshToken: string }) {
+    return this.authService.refreshTokens(body.refreshToken, sessionContextFromRequest(req));
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Body() body: { refreshToken: string }) {
     await this.authService.logout(body.refreshToken);
+    return { success: true };
+  }
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async listSessions(@Req() req: FastifyRequest & { user: { sub: string; sessionId?: string } }) {
+    return this.authService.listSessions(req.user.sub, req.user.sessionId);
+  }
+
+  @Delete('sessions/others')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async revokeAllOtherSessions(
+    @Req() req: FastifyRequest & { user: { sub: string; sessionId?: string } },
+  ) {
+    await this.authService.revokeAllOtherSessions(req.user.sub, req.user.sessionId);
+    return { success: true };
+  }
+
+  @Delete('sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async revokeSession(
+    @Req() req: FastifyRequest & { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    await this.authService.revokeSession(req.user.sub, id);
     return { success: true };
   }
 
@@ -127,13 +168,19 @@ export class AuthController {
 
   @Post('passkey/login/verify')
   @HttpCode(HttpStatus.OK)
-  async passkeyLoginVerify(@Body() body: { userId?: string; response: any }) {
+  async passkeyLoginVerify(
+    @Req() req: FastifyRequest,
+    @Body() body: { userId?: string; response: any },
+  ) {
     const { verification, userId } = await this.passkeyService.verifyAuthentication(
       body.response,
       body.userId,
     );
     if (!verification.verified) return { verified: false };
-    return { verified: true, ...(await this.authService.loginWithPasskey(userId)) };
+    return {
+      verified: true,
+      ...(await this.authService.loginWithPasskey(userId!, sessionContextFromRequest(req))),
+    };
   }
 
   @Get('passkey')

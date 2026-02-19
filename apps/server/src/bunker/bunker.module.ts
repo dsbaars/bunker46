@@ -5,11 +5,12 @@ import { BunkerUriService } from './bunker-uri.service.js';
 import { BunkerRpcHandler } from './bunker-rpc.handler.js';
 import { ConnectionsModule } from '../connections/connections.module.js';
 import { LoggingModule } from '../logging/logging.module.js';
+import { EventsModule } from '../events/events.module.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { BunkerController } from './bunker.controller.js';
 
 @Module({
-  imports: [forwardRef(() => ConnectionsModule), LoggingModule],
+  imports: [forwardRef(() => ConnectionsModule), LoggingModule, EventsModule],
   providers: [BunkerService, BunkerGateway, BunkerUriService, BunkerRpcHandler, EncryptionService],
   controllers: [BunkerController],
   exports: [BunkerService],
