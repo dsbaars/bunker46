@@ -18,7 +18,16 @@ const $auth = atom<AuthState>({
   requiresTotp: false,
 });
 
-type ProfileResult = { profile: UserProfileDto } | { unauthorized: true } | null;
+type ProfileOk = { profile: UserProfileDto };
+type ProfileUnauthorized = { unauthorized: true };
+type ProfileResult = ProfileOk | ProfileUnauthorized | null;
+
+function isProfileOk(r: ProfileResult): r is ProfileOk {
+  return r !== null && 'profile' in r;
+}
+function isProfileUnauthorized(r: ProfileResult): r is ProfileUnauthorized {
+  return r !== null && 'unauthorized' in r;
+}
 
 async function fetchProfile(accessToken: string): Promise<ProfileResult> {
   try {
@@ -27,7 +36,7 @@ async function fetchProfile(accessToken: string): Promise<ProfileResult> {
     });
     if (res.status === 401) return { unauthorized: true };
     if (!res.ok) return null;
-    const profile = await res.json();
+    const profile = (await res.json()) as UserProfileDto;
     return { profile };
   } catch {
     return null;
@@ -92,9 +101,9 @@ export function useAuthStore() {
       const { accessToken, user } = $auth.get();
       if (!accessToken || user) return;
       const result = await fetchProfile(accessToken);
-      if (result?.profile) {
+      if (isProfileOk(result)) {
         $auth.set({ ...$auth.get(), user: result.profile });
-      } else if (result?.unauthorized) {
+      } else if (isProfileUnauthorized(result)) {
         $auth.set({ accessToken: null, refreshToken: null, user: null, requiresTotp: false });
         await authStorage.removeItem('tokens');
       }
@@ -114,11 +123,11 @@ export function useAuthStore() {
 
       let result = await fetchProfile(tokens.accessToken);
 
-      if (result?.profile) {
+      if (isProfileOk(result)) {
         $auth.set({ ...$auth.get(), user: result.profile });
         return;
       }
-      if (result?.unauthorized && tokens.refreshToken) {
+      if (isProfileUnauthorized(result) && tokens.refreshToken) {
         const refreshed = await tryRefreshTokens(tokens.refreshToken);
         if (refreshed) {
           $auth.set({
@@ -131,14 +140,14 @@ export function useAuthStore() {
             refreshToken: refreshed.refreshToken,
           });
           result = await fetchProfile(refreshed.accessToken);
-          if (result?.profile) {
+          if (isProfileOk(result)) {
             $auth.set({ ...$auth.get(), user: result.profile });
             return;
           }
         }
       }
       // 401 and refresh failed or no refresh: clear tokens so user gets login, not dashboard with no data
-      if (result?.unauthorized) {
+      if (isProfileUnauthorized(result)) {
         $auth.set({ accessToken: null, refreshToken: null, user: null, requiresTotp: false });
         await authStorage.removeItem('tokens');
       }
