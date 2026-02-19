@@ -1,0 +1,3 @@
+# Normalize line endings to LF everywhere so Prettier (endOfLine: lf) and CI match.
+* text=auto eol=lf
+*.{ts,vue,js,json,md,yaml,yml} text eol=lf
