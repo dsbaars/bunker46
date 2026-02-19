@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Link2, KeyRound, Plug } from 'lucide-vue-next';
+import { Link2, KeyRound, Plug, Lock, Unlock } from 'lucide-vue-next';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';
@@ -494,8 +494,29 @@ function statusVariant(status: string) {
             <p class="text-xs text-muted-foreground mt-1 font-mono truncate">
               {{ conn.nsecKey.label }} · {{ conn.clientPubkey.slice(0, 12) }}...
             </p>
-            <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              <span>{{ conn.permissions.length }} permissions</span>
+            <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+              <span
+                class="flex items-center gap-1"
+                :class="
+                  conn.permissions.length === 0
+                    ? 'text-amber-600 dark:text-amber-400 font-medium'
+                    : ''
+                "
+              >
+                <Unlock
+                  v-if="conn.permissions.length === 0"
+                  class="w-3.5 h-3.5 shrink-0"
+                />
+                <Lock
+                  v-else
+                  class="w-3.5 h-3.5 shrink-0"
+                />
+                {{
+                  conn.permissions.length === 0
+                    ? 'Unrestricted'
+                    : `${conn.permissions.length} permissions`
+                }}
+              </span>
               <span>{{ conn._count.logs }} logs</span>
               <span v-if="conn.lastActivity"> Last: {{ formatDate(conn.lastActivity) }} </span>
             </div>

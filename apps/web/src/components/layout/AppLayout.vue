@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useStore } from '@nanostores/vue';
 import {
   LayoutDashboard,
   Key,
@@ -13,7 +14,7 @@ import {
   Menu,
 } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
-import { useUiStore } from '@/stores/ui';
+import { useUiStore, $ui } from '@/stores/ui';
 import { useSettingsStore } from '@/stores/settings';
 import Button from '@/components/ui/Button.vue';
 
@@ -21,6 +22,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const ui = useUiStore();
+const uiState = useStore($ui);
 const settingsStore = useSettingsStore();
 const mobileMenuOpen = ref(false);
 
@@ -60,23 +62,38 @@ function handleLogout() {
     <aside
       :class="[
         'fixed inset-y-0 left-0 z-50 flex flex-col bg-card border-r border-border transition-all duration-300 lg:relative',
-        ui.sidebarCollapsed ? 'w-16' : 'w-64',
+        uiState.sidebarCollapsed ? 'w-16' : 'w-64',
         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       ]"
     >
-      <div class="flex items-center gap-3 p-4 border-b border-border">
+      <div class="flex items-center gap-2 p-4 border-b border-border">
         <img
           src="/logo.png"
           alt="Bunker46"
           class="w-8 h-8 rounded-lg object-contain shrink-0"
         >
         <span
-          v-if="!ui.sidebarCollapsed"
-          class="font-semibold text-lg"
+          v-if="!uiState.sidebarCollapsed"
+          class="font-semibold text-lg truncate"
         >Bunker46</span>
+        <button
+          type="button"
+          class="ml-auto hidden lg:flex p-2 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer shrink-0"
+          :title="uiState.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          @click="ui.toggleSidebar()"
+        >
+          <PanelLeftClose
+            v-if="uiState.sidebarCollapsed"
+            class="w-5 h-5"
+          />
+          <PanelLeft
+            v-else
+            class="w-5 h-5"
+          />
+        </button>
       </div>
 
-      <nav class="flex-1 p-3 space-y-1">
+      <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
         <router-link
           v-for="item in navItems"
           :key="item.path"
@@ -93,26 +110,9 @@ function handleLogout() {
             :is="item.icon"
             class="w-5 h-5 shrink-0"
           />
-          <span v-if="!ui.sidebarCollapsed">{{ item.name }}</span>
+          <span v-if="!uiState.sidebarCollapsed">{{ item.name }}</span>
         </router-link>
       </nav>
-
-      <div class="p-3 border-t border-border">
-        <button
-          class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
-          @click="ui.toggleSidebar()"
-        >
-          <PanelLeftClose
-            v-if="ui.sidebarCollapsed"
-            class="w-5 h-5 shrink-0"
-          />
-          <PanelLeft
-            v-else
-            class="w-5 h-5 shrink-0"
-          />
-          <span v-if="!ui.sidebarCollapsed">Collapse</span>
-        </button>
-      </div>
     </aside>
 
     <div
