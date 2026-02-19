@@ -7,7 +7,7 @@ A modern, secure NIP-46 Nsec Bunker management tool built with TypeScript.
 | Layer        | Technology                                                                   |
 | ------------ | ---------------------------------------------------------------------------- |
 | **Frontend** | Vue 3, Vite 7, Tailwind CSS v4, shadcn-vue, nanostores, localforage          |
-| **Backend**  | NestJS 11, Fastify, Prisma ORM, nostr-tools                                  |
+| **Backend**  | NestJS 11, Fastify, Prisma ORM 7 (driver adapter), nostr-tools               |
 | **Database** | PostgreSQL 17                                                                |
 | **Auth**     | JWT + Argon2, TOTP (otplib), WebAuthn/Passkeys (@simplewebauthn)             |
 | **Testing**  | Vitest, Playwright, eslint-plugin-security                                   |
@@ -67,9 +67,11 @@ docker compose -f docker-compose.dev.yml up -d
 cp .env.example .env
 # Optional: set REDIS_URL=redis://localhost:6379 in .env for live dashboard/connections updates
 
-# Generate Prisma client & run migrations
+# Generate Prisma client (required; runs automatically on pnpm install) & run migrations
 pnpm db:generate
 pnpm db:migrate
+# Optional: seed the database (Prisma 7 does not auto-seed after migrate)
+# pnpm --filter @bunker46/server run db:seed
 
 # Start dev servers (backend + frontend)
 pnpm dev

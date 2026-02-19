@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import type { User } from '@prisma/client';
+import type { User } from '@/generated/prisma/client.js';
 import { UsersService } from './users.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 

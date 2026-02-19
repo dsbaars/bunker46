@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { EventsService } from '../events/events.service.js';
-import type { ConnectionStatus as PrismaConnectionStatus } from '@prisma/client';
+import type { ConnectionStatus as PrismaConnectionStatus } from '@/generated/prisma/client.js';
 import type { PermissionDescriptor } from '@bunker46/shared-types';
 
 @Injectable()

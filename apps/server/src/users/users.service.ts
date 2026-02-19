@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import * as argon2 from 'argon2';
-import type { User } from '@prisma/client';
+import type { User } from '@/generated/prisma/client.js';
 
 @Injectable()
 export class UsersService {

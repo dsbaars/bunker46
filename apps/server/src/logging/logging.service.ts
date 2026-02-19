@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { LogResult } from '@prisma/client';
+import type { LogResult } from '@/generated/prisma/client.js';
 
 interface LogEntry {
   connectionId: string;
