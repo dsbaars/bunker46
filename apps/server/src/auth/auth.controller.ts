@@ -121,19 +121,19 @@ export class AuthController {
 
   @Post('passkey/login/options')
   @HttpCode(HttpStatus.OK)
-  async passkeyLoginOptions(@Body() body: { username: string }) {
-    const { options, userId } = await this.passkeyService.generateAuthenticationOptions(
-      body.username,
-    );
-    return { options, userId };
+  async passkeyLoginOptions(@Body() body: { username?: string }) {
+    return this.passkeyService.generateAuthenticationOptions(body.username);
   }
 
   @Post('passkey/login/verify')
   @HttpCode(HttpStatus.OK)
-  async passkeyLoginVerify(@Body() body: { userId: string; response: any }) {
-    const result = await this.passkeyService.verifyAuthentication(body.userId, body.response);
-    if (!result.verified) return { verified: false };
-    return { verified: true, ...(await this.authService.loginWithPasskey(body.userId)) };
+  async passkeyLoginVerify(@Body() body: { userId?: string; response: any }) {
+    const { verification, userId } = await this.passkeyService.verifyAuthentication(
+      body.response,
+      body.userId,
+    );
+    if (!verification.verified) return { verified: false };
+    return { verified: true, ...(await this.authService.loginWithPasskey(userId)) };
   }
 
   @Get('passkey')

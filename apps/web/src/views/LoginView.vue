@@ -51,20 +51,26 @@ async function handleLogin() {
   }
 }
 
+/** Usernameless: no username, browser shows passkey picker. */
 async function handlePasskeyLogin() {
   passkeyError.value = '';
   passkeyLoading.value = true;
   try {
-    const { options, userId } = await api.post<{ options: any; userId: string }>(
+    const payload =
+      showPasskeyForm.value && passkeyUsername.value.trim()
+        ? { username: passkeyUsername.value.trim() }
+        : {};
+    const { options, userId } = await api.post<{ options: any; userId?: string }>(
       '/auth/passkey/login/options',
-      { username: passkeyUsername.value },
+      payload,
     );
     const authResp = await startAuthentication({ optionsJSON: options });
+    const verifyPayload = userId ? { userId, response: authResp } : { response: authResp };
     const res = await api.post<{
       verified: boolean;
       accessToken?: string;
       refreshToken?: string;
-    }>('/auth/passkey/login/verify', { userId, response: authResp });
+    }>('/auth/passkey/login/verify', verifyPayload);
 
     if (res.verified && res.accessToken) {
       auth.setTokens(res.accessToken, res.refreshToken);
@@ -144,27 +150,39 @@ async function handlePasskeyLogin() {
         </div>
       </div>
 
-      <div v-if="!showPasskeyForm">
+      <div class="space-y-3">
         <Button
           variant="outline"
           class="w-full"
-          @click="showPasskeyForm = true"
+          :loading="passkeyLoading"
+          @click="handlePasskeyLogin"
         >
           Sign in with Passkey
         </Button>
-      </div>
-
-      <div
-        v-else
-        class="space-y-3"
-      >
-        <div>
-          <label class="text-sm font-medium mb-1.5 block">Username</label>
+        <button
+          type="button"
+          class="text-xs text-muted-foreground hover:text-foreground"
+          @click="showPasskeyForm = !showPasskeyForm"
+        >
+          {{ showPasskeyForm ? 'Hide' : 'Use username instead' }}
+        </button>
+        <div
+          v-if="showPasskeyForm"
+          class="flex gap-2 items-end"
+        >
           <Input
             v-model="passkeyUsername"
-            placeholder="Enter your username"
+            placeholder="Username (for older passkeys)"
             autocomplete="username"
+            class="flex-1"
           />
+          <Button
+            variant="outline"
+            :loading="passkeyLoading"
+            @click="handlePasskeyLogin"
+          >
+            Continue
+          </Button>
         </div>
         <p
           v-if="passkeyError"
@@ -172,22 +190,6 @@ async function handlePasskeyLogin() {
         >
           {{ passkeyError }}
         </p>
-        <div class="flex gap-2">
-          <Button
-            variant="outline"
-            class="flex-1"
-            @click="showPasskeyForm = false"
-          >
-            Cancel
-          </Button>
-          <Button
-            :loading="passkeyLoading"
-            class="flex-1"
-            @click="handlePasskeyLogin"
-          >
-            Continue
-          </Button>
-        </div>
       </div>
 
       <div class="mt-4 text-center text-sm text-muted-foreground">

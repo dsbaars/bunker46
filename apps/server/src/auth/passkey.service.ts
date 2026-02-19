@@ -30,6 +30,7 @@ export class PasskeyService {
     const options = await generateRegistrationOptions({
       rpName: this.rpName,
       rpID: this.rpId,
+      userID: new TextEncoder().encode(userId),
       userName: username,
       attestationType: 'none',
       excludeCredentials: existingPasskeys.map((p) => ({
@@ -37,7 +38,7 @@ export class PasskeyService {
         transports: p.transports as any[],
       })),
       authenticatorSelection: {
-        residentKey: 'preferred',
+        residentKey: 'required',
         userVerification: 'preferred',
       },
     });
@@ -77,36 +78,66 @@ export class PasskeyService {
     return verification;
   }
 
-  async generateAuthenticationOptions(username: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { username },
-      include: { passkeys: true },
-    });
-    if (!user) throw new Error('User not found');
+  async generateAuthenticationOptions(username?: string) {
+    if (username) {
+      const user = await this.prisma.user.findUnique({
+        where: { username },
+        include: { passkeys: true },
+      });
+      if (!user) throw new Error('User not found');
 
+      const options = await generateAuthenticationOptions({
+        rpID: this.rpId,
+        allowCredentials: user.passkeys.map((p) => ({
+          id: p.credentialId,
+          transports: p.transports as any[],
+        })),
+        userVerification: 'preferred',
+      });
+
+      this.challenges.set(user.id, options.challenge);
+      return { options, userId: user.id };
+    }
+
+    // Usernameless: no allowCredentials so the browser shows discoverable passkeys
     const options = await generateAuthenticationOptions({
       rpID: this.rpId,
-      allowCredentials: user.passkeys.map((p) => ({
-        id: p.credentialId,
-        transports: p.transports as any[],
-      })),
+      allowCredentials: [],
       userVerification: 'preferred',
     });
-
-    this.challenges.set(user.id, options.challenge);
-    return { options, userId: user.id };
+    this.challenges.set(options.challenge, options.challenge);
+    return { options, userId: undefined };
   }
 
-  async verifyAuthentication(userId: string, response: AuthenticationResponseJSON) {
-    const expectedChallenge = this.challenges.get(userId);
-    if (!expectedChallenge) throw new Error('No challenge found');
-
+  /**
+   * Verify passkey authentication. If userId is omitted (usernameless flow),
+   * the user is resolved from the credential id in the response.
+   */
+  async verifyAuthentication(
+    response: AuthenticationResponseJSON,
+    userId?: string,
+  ): Promise<{
+    verification: Awaited<ReturnType<typeof verifyAuthenticationResponse>>;
+    userId: string;
+  }> {
     const passkey = await this.prisma.passkey.findUnique({
       where: { credentialId: response.id },
     });
-    if (!passkey || passkey.userId !== userId) {
-      throw new Error('Passkey not found');
-    }
+    if (!passkey) throw new Error('Passkey not found');
+    const resolvedUserId = userId ?? passkey.userId;
+    if (passkey.userId !== resolvedUserId) throw new Error('Passkey not found');
+
+    const expectedChallenge =
+      userId !== undefined
+        ? this.challenges.get(userId)
+        : (() => {
+            const json = Buffer.from(response.response.clientDataJSON, 'base64url').toString(
+              'utf8',
+            );
+            const clientData = JSON.parse(json) as { challenge: string };
+            return clientData.challenge;
+          })();
+    if (!expectedChallenge) throw new Error('No challenge found');
 
     const verification = await verifyAuthenticationResponse({
       response,
@@ -126,10 +157,11 @@ export class PasskeyService {
         where: { id: passkey.id },
         data: { counter: BigInt(verification.authenticationInfo.newCounter) },
       });
-      this.challenges.delete(userId);
+      if (userId !== undefined) this.challenges.delete(userId);
+      else this.challenges.delete(expectedChallenge);
     }
 
-    return verification;
+    return { verification, userId: passkey.userId };
   }
 
   async listPasskeys(userId: string) {
