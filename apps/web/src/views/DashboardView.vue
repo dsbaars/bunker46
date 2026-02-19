@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { Activity, Link2, PenLine, BarChart3 } from 'lucide-vue-next';
 import { api } from '@/lib/api';
 import { useFormatting } from '@/composables/useFormatting';
 import type { DashboardStatsDto } from '@bunker46/shared-types';
@@ -51,24 +52,36 @@ function resultBadgeVariant(result: string) {
         <StatCard
           title="Active Sessions"
           :value="stats.activeSessions"
-          icon="●"
-        />
+        >
+          <template #icon>
+            <Activity class="w-5 h-5 text-muted-foreground shrink-0" />
+          </template>
+        </StatCard>
         <StatCard
           title="Active Connections"
           :value="stats.activeConnections"
           :description="`${stats.totalConnections} total`"
-          icon="⇋"
-        />
+        >
+          <template #icon>
+            <Link2 class="w-5 h-5 text-muted-foreground shrink-0" />
+          </template>
+        </StatCard>
         <StatCard
           title="Actions (24h)"
           :value="stats.signingActions24h"
-          icon="✎"
-        />
+        >
+          <template #icon>
+            <PenLine class="w-5 h-5 text-muted-foreground shrink-0" />
+          </template>
+        </StatCard>
         <StatCard
           title="Actions (7d)"
           :value="stats.signingActions7d"
-          icon="📊"
-        />
+        >
+          <template #icon>
+            <BarChart3 class="w-5 h-5 text-muted-foreground shrink-0" />
+          </template>
+        </StatCard>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

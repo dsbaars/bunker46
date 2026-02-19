@@ -5,7 +5,6 @@ defineProps<{
   title: string;
   value: string | number;
   description?: string;
-  icon?: string;
 }>();
 </script>
 
@@ -15,10 +14,7 @@ defineProps<{
       <h3 class="text-sm font-medium text-muted-foreground">
         {{ title }}
       </h3>
-      <span
-        v-if="icon"
-        class="text-muted-foreground text-lg"
-      >{{ icon }}</span>
+      <slot name="icon" />
     </div>
     <div class="text-2xl font-bold">
       {{ value }}

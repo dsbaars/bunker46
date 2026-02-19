@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { Link2, KeyRound, Plug } from 'lucide-vue-next';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';
@@ -205,12 +206,14 @@ function statusVariant(status: string) {
         class="flex gap-2"
       >
         <Button @click="enterMode('generate')">
+          <KeyRound class="w-4 h-4 mr-2 shrink-0" />
           Generate bunker:// URI
         </Button>
         <Button
           variant="ghost"
           @click="enterMode('import')"
         >
+          <Link2 class="w-4 h-4 mr-2 shrink-0" />
           Use Nostrconnect URI
         </Button>
       </div>
@@ -432,8 +435,8 @@ function statusVariant(status: string) {
       v-else-if="connections.length === 0 && mode === 'idle'"
       class="text-center py-12"
     >
-      <div class="text-4xl mb-4">
-        ⇋
+      <div class="flex justify-center mb-4">
+        <Plug class="w-12 h-12 text-muted-foreground" />
       </div>
       <p class="text-muted-foreground mb-2">
         No connections yet
@@ -444,6 +447,7 @@ function statusVariant(status: string) {
       </p>
       <div class="flex gap-3 justify-center">
         <Button @click="enterMode('generate')">
+          <KeyRound class="w-4 h-4 mr-2 shrink-0" />
           Generate bunker:// URI
         </Button>
       </div>

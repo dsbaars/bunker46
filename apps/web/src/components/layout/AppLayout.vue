@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import {
+  LayoutDashboard,
+  Key,
+  Link2,
+  Radio,
+  Shield,
+  SlidersHorizontal,
+  PanelLeftClose,
+  PanelLeft,
+  Menu,
+} from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { useSettingsStore } from '@/stores/settings';
@@ -19,12 +30,12 @@ const showLayout = computed(() => {
 });
 
 const navItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: '⊞' },
-  { name: 'Keys', path: '/keys', icon: '🔑' },
-  { name: 'Connections', path: '/connections', icon: '⇋' },
-  { name: 'Relays', path: '/settings/relays', icon: '📡' },
-  { name: 'Security', path: '/settings/security', icon: '⚙' },
-  { name: 'General', path: '/settings/general', icon: '◈' },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { name: 'Keys', path: '/keys', icon: Key },
+  { name: 'Connections', path: '/connections', icon: Link2 },
+  { name: 'Relays', path: '/settings/relays', icon: Radio },
+  { name: 'Security', path: '/settings/security', icon: Shield },
+  { name: 'General', path: '/settings/general', icon: SlidersHorizontal },
 ];
 
 function handleLogout() {
@@ -78,7 +89,10 @@ function handleLogout() {
           ]"
           @click="mobileMenuOpen = false"
         >
-          <span class="text-lg w-5 text-center">{{ item.icon }}</span>
+          <component
+            :is="item.icon"
+            class="w-5 h-5 shrink-0"
+          />
           <span v-if="!ui.sidebarCollapsed">{{ item.name }}</span>
         </router-link>
       </nav>
@@ -88,7 +102,14 @@ function handleLogout() {
           class="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
           @click="ui.toggleSidebar()"
         >
-          <span class="text-lg w-5 text-center">{{ ui.sidebarCollapsed ? '→' : '←' }}</span>
+          <PanelLeftClose
+            v-if="ui.sidebarCollapsed"
+            class="w-5 h-5 shrink-0"
+          />
+          <PanelLeft
+            v-else
+            class="w-5 h-5 shrink-0"
+          />
           <span v-if="!ui.sidebarCollapsed">Collapse</span>
         </button>
       </div>
@@ -108,7 +129,7 @@ function handleLogout() {
           class="lg:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer"
           @click="mobileMenuOpen = !mobileMenuOpen"
         >
-          <span class="text-xl">☰</span>
+          <Menu class="w-6 h-6" />
         </button>
 
         <div class="flex-1" />

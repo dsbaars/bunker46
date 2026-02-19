@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { Key, Star, Trash2 } from 'lucide-vue-next';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';
@@ -183,8 +184,8 @@ function setDefault(id: string) {
       v-else-if="keys.length === 0"
       class="text-center py-12"
     >
-      <div class="text-4xl mb-4">
-        🔑
+      <div class="flex justify-center mb-4">
+        <Key class="w-12 h-12 text-muted-foreground" />
       </div>
       <p class="text-muted-foreground mb-4">
         No nsec keys yet. Add one to start managing connections.
@@ -232,15 +233,15 @@ function setDefault(id: string) {
           <div class="flex items-center gap-2 shrink-0">
             <button
               :title="ui.defaultKeyId === key.id ? 'Unset as default' : 'Set as default'"
-              class="text-lg transition-colors cursor-pointer"
+              class="p-1 rounded transition-colors cursor-pointer"
               :class="
                 ui.defaultKeyId === key.id
-                  ? 'text-yellow-400'
-                  : 'text-muted-foreground hover:text-yellow-400'
+                  ? 'text-yellow-500'
+                  : 'text-muted-foreground hover:text-yellow-500'
               "
               @click="setDefault(key.id)"
             >
-              ★
+              <Star :class="['w-5 h-5', ui.defaultKeyId === key.id ? 'fill-current' : '']" />
             </button>
             <Button
               variant="ghost"
@@ -248,6 +249,7 @@ function setDefault(id: string) {
               class="text-destructive hover:text-destructive"
               @click="deleteKey(key.id)"
             >
+              <Trash2 class="w-4 h-4 mr-1.5 shrink-0" />
               Delete
             </Button>
           </div>
