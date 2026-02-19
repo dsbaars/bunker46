@@ -28,6 +28,7 @@ describe('Router guards', () => {
       const auth = mockUseAuthStore();
       if (to.meta.requiresAuth && !auth?.isAuthenticated) return { name: 'login' };
       if (to.meta.guest && auth?.isAuthenticated) return { name: 'dashboard' };
+      return;
     });
     await router.push('/login');
   });

@@ -14,10 +14,10 @@
     "build": "tsc"
   },
   "dependencies": {
-    "zod": "^3.24.0"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@bunker46/tsconfig": "workspace:*",
-    "typescript": "^5.7.0"
+    "typescript": "^5.9.3"
   }
 }

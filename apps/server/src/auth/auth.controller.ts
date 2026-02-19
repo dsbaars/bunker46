@@ -79,8 +79,9 @@ export class AuthController {
     @Req() req: FastifyRequest & { user: { sub: string } },
     @Body() body: { secret: string; code: string },
   ) {
-    const { authenticator } = await import('otplib');
-    const valid = authenticator.verify({ token: body.code, secret: body.secret });
+    const { verifySync } = await import('otplib');
+    const result = verifySync({ token: body.code, secret: body.secret });
+    const valid = result.valid;
     if (!valid) return { success: false, message: 'Invalid TOTP code' };
 
     await this.totpService.enableTotp(req.user.sub, body.secret);

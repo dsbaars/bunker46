@@ -16,11 +16,11 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "zod": "^3.24.0"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@bunker46/tsconfig": "workspace:*",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.0"
   }
 }

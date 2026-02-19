@@ -2,6 +2,7 @@ import eslintJs from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import pluginVue from 'eslint-plugin-vue';
 import security from 'eslint-plugin-security';
+import globals from 'globals';
 
 export default tseslint.config(
   eslintJs.configs.recommended,
@@ -9,8 +10,9 @@ export default tseslint.config(
   ...pluginVue.configs['flat/recommended'],
   security.configs.recommended,
   {
-    files: ['*.vue', '**/*.vue'],
+    files: ['*.vue', '**/*.vue', '**/*.ts', '**/*.tsx'],
     languageOptions: {
+      globals: { ...globals.browser },
       parserOptions: {
         parser: tseslint.parser,
       },

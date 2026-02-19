@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { authenticator } from 'otplib';
+import { generateSecret, generateURI, verifySync } from 'otplib';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { UsersService } from '../users/users.service.js';
 import * as QRCode from 'qrcode';
@@ -12,11 +12,11 @@ export class TotpService {
   ) {}
 
   generateSecret(): string {
-    return authenticator.generateSecret();
+    return generateSecret();
   }
 
   generateOtpauthUrl(secret: string, username: string): string {
-    return authenticator.keyuri(username, 'Bunker46', secret);
+    return generateURI({ issuer: 'Bunker46', label: username, secret });
   }
 
   async generateQrDataUrl(otpauthUrl: string): Promise<string> {
@@ -25,7 +25,8 @@ export class TotpService {
 
   verifyToken(encryptedSecret: string, token: string): boolean {
     const secret = this.encryption.decrypt(encryptedSecret);
-    return authenticator.verify({ token, secret });
+    const result = verifySync({ token, secret });
+    return result.valid;
   }
 
   async enableTotp(userId: string, secret: string) {

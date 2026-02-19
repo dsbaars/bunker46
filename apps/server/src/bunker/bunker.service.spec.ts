@@ -5,11 +5,13 @@ import type { BunkerRpcHandler } from './bunker-rpc.handler.js';
 import type { EncryptionService } from '../common/crypto/encryption.service.js';
 
 vi.mock('nostr-tools/pool', () => ({
-  SimplePool: vi.fn().mockImplementation(() => ({
-    subscribe: vi.fn().mockReturnValue({ close: vi.fn() }),
-    close: vi.fn(),
-    publish: vi.fn().mockResolvedValue(undefined),
-  })),
+  SimplePool: vi.fn().mockImplementation(function (this: unknown) {
+    return {
+      subscribe: vi.fn().mockReturnValue({ close: vi.fn() }),
+      close: vi.fn(),
+      publish: vi.fn().mockResolvedValue(undefined),
+    };
+  }),
   useWebSocketImplementation: vi.fn(),
 }));
 
@@ -81,11 +83,13 @@ describe('BunkerService', () => {
     it('should stop listening when stopListeningForKey is called', async () => {
       const poolModule = await import('nostr-tools/pool');
       const closeFn = vi.fn();
-      vi.mocked(poolModule.SimplePool).mockImplementationOnce(() => ({
-        subscribe: vi.fn().mockReturnValue({ close: closeFn }),
-        close: vi.fn(),
-        publish: vi.fn().mockResolvedValue(undefined),
-      }));
+      vi.mocked(poolModule.SimplePool).mockImplementationOnce(function (this: unknown) {
+        return {
+          subscribe: vi.fn().mockReturnValue({ close: closeFn }),
+          close: vi.fn(),
+          publish: vi.fn().mockResolvedValue(undefined),
+        };
+      });
       service = new BunkerService(
         rpcHandler as BunkerRpcHandler,
         prisma as PrismaService,

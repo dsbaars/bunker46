@@ -90,6 +90,7 @@ router.beforeEach((to) => {
   if (to.meta.guest && auth.isAuthenticated) {
     return { name: 'dashboard' };
   }
+  return;
 });
 
 export { router };
