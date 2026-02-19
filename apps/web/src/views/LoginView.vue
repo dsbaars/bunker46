@@ -2,18 +2,26 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useSettingsStore } from '@/stores/settings';
 import { api } from '@/lib/api';
+import { startAuthentication } from '@simplewebauthn/browser';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
 import Card from '@/components/ui/Card.vue';
 
 const router = useRouter();
 const auth = useAuthStore();
+const settings = useSettingsStore();
 
 const username = ref('');
 const password = ref('');
 const error = ref('');
 const loading = ref(false);
+
+const passkeyUsername = ref('');
+const passkeyError = ref('');
+const passkeyLoading = ref(false);
+const showPasskeyForm = ref(false);
 
 async function handleLogin() {
   error.value = '';
@@ -33,6 +41,7 @@ async function handleLogin() {
       auth.setTokens(res.accessToken, res.refreshToken);
       const profile = await api.get<any>('/users/me');
       auth.setUser(profile);
+      await settings.load(res.accessToken);
       router.push('/dashboard');
     }
   } catch (err) {
@@ -41,16 +50,47 @@ async function handleLogin() {
     loading.value = false;
   }
 }
+
+async function handlePasskeyLogin() {
+  passkeyError.value = '';
+  passkeyLoading.value = true;
+  try {
+    const { options, userId } = await api.post<{ options: any; userId: string }>(
+      '/auth/passkey/login/options',
+      { username: passkeyUsername.value },
+    );
+    const authResp = await startAuthentication({ optionsJSON: options });
+    const res = await api.post<{
+      verified: boolean;
+      accessToken?: string;
+      refreshToken?: string;
+    }>('/auth/passkey/login/verify', { userId, response: authResp });
+
+    if (res.verified && res.accessToken) {
+      auth.setTokens(res.accessToken, res.refreshToken);
+      const profile = await api.get<any>('/users/me');
+      auth.setUser(profile);
+      await settings.load(res.accessToken);
+      router.push('/dashboard');
+    } else {
+      passkeyError.value = 'Passkey verification failed';
+    }
+  } catch (err) {
+    passkeyError.value = err instanceof Error ? err.message : 'Passkey login failed';
+  } finally {
+    passkeyLoading.value = false;
+  }
+}
 </script>
 
 <template>
   <div class="w-full max-w-md mx-auto">
     <div class="text-center mb-8">
-      <div
-        class="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-2xl mx-auto mb-4"
+      <img
+        src="/logo.png"
+        alt="Bunker46"
+        class="w-16 h-16 rounded-2xl object-contain mx-auto mb-4"
       >
-        B
-      </div>
       <h1 class="text-2xl font-bold">
         Welcome to Bunker46
       </h1>
@@ -94,6 +134,61 @@ async function handleLogin() {
           Sign In
         </Button>
       </form>
+
+      <div class="relative my-4">
+        <div class="absolute inset-0 flex items-center">
+          <div class="w-full border-t border-border" />
+        </div>
+        <div class="relative flex justify-center text-xs text-muted-foreground">
+          <span class="bg-card px-2">or</span>
+        </div>
+      </div>
+
+      <div v-if="!showPasskeyForm">
+        <Button
+          variant="outline"
+          class="w-full"
+          @click="showPasskeyForm = true"
+        >
+          Sign in with Passkey
+        </Button>
+      </div>
+
+      <div
+        v-else
+        class="space-y-3"
+      >
+        <div>
+          <label class="text-sm font-medium mb-1.5 block">Username</label>
+          <Input
+            v-model="passkeyUsername"
+            placeholder="Enter your username"
+            autocomplete="username"
+          />
+        </div>
+        <p
+          v-if="passkeyError"
+          class="text-sm text-destructive"
+        >
+          {{ passkeyError }}
+        </p>
+        <div class="flex gap-2">
+          <Button
+            variant="outline"
+            class="flex-1"
+            @click="showPasskeyForm = false"
+          >
+            Cancel
+          </Button>
+          <Button
+            :loading="passkeyLoading"
+            class="flex-1"
+            @click="handlePasskeyLogin"
+          >
+            Continue
+          </Button>
+        </div>
+      </div>
 
       <div class="mt-4 text-center text-sm text-muted-foreground">
         Don't have an account?

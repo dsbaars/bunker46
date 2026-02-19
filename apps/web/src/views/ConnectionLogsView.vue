@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '@/lib/api';
+import { useFormatting } from '@/composables/useFormatting';
 import Card from '@/components/ui/Card.vue';
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
@@ -23,6 +24,7 @@ const logs = ref<Log[]>([]);
 const total = ref(0);
 const page = ref(1);
 const loading = ref(true);
+const { formatDateTime } = useFormatting();
 
 async function loadLogs() {
   loading.value = true;
@@ -126,7 +128,7 @@ function resultVariant(result: string) {
                   {{ log.durationMs }}ms
                 </td>
                 <td class="py-2.5 text-muted-foreground">
-                  {{ new Date(log.createdAt).toLocaleString() }}
+                  {{ formatDateTime(log.createdAt) }}
                 </td>
               </tr>
             </tbody>

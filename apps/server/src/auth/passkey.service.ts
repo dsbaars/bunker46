@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -130,5 +130,21 @@ export class PasskeyService {
     }
 
     return verification;
+  }
+
+  async listPasskeys(userId: string) {
+    const passkeys = await this.prisma.passkey.findMany({
+      where: { userId },
+      select: { id: true, name: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return passkeys;
+  }
+
+  async deletePasskey(userId: string, passkeyId: string) {
+    const passkey = await this.prisma.passkey.findUnique({ where: { id: passkeyId } });
+    if (!passkey) throw new NotFoundException('Passkey not found');
+    if (passkey.userId !== userId) throw new ForbiddenException('Not your passkey');
+    await this.prisma.passkey.delete({ where: { id: passkeyId } });
   }
 }

@@ -8,7 +8,6 @@ export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 
 export const RegisterRequestSchema = z.object({
   username: z.string().min(3).max(64),
-  email: z.string().email().optional(),
   password: z.string().min(8).max(128),
 });
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
@@ -27,8 +26,12 @@ export type AuthTokens = z.infer<typeof AuthTokensSchema>;
 export interface UserProfileDto {
   id: string;
   username: string;
-  email?: string;
   totpEnabled: boolean;
   passkeysCount: number;
   createdAt: string;
+}
+
+export interface UserSettingsDto {
+  dateFormat: string;
+  timeFormat: string;
 }

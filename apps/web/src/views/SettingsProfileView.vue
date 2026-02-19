@@ -2,11 +2,13 @@
 import { ref, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { api } from '@/lib/api';
+import { useFormatting } from '@/composables/useFormatting';
 import Card from '@/components/ui/Card.vue';
 import type { UserProfileDto } from '@bunker46/shared-types';
 
 const auth = useAuthStore();
 const profile = ref<UserProfileDto | null>(null);
+const { formatDate } = useFormatting();
 
 onMounted(async () => {
   try {
@@ -36,12 +38,6 @@ onMounted(async () => {
           </p>
         </div>
         <div>
-          <label class="text-sm font-medium text-muted-foreground">Email</label>
-          <p class="text-lg">
-            {{ profile.email || 'Not set' }}
-          </p>
-        </div>
-        <div>
           <label class="text-sm font-medium text-muted-foreground">2FA Status</label>
           <p>{{ profile.totpEnabled ? 'Enabled' : 'Disabled' }}</p>
         </div>
@@ -51,7 +47,7 @@ onMounted(async () => {
         </div>
         <div>
           <label class="text-sm font-medium text-muted-foreground">Member Since</label>
-          <p>{{ new Date(profile.createdAt).toLocaleDateString() }}</p>
+          <p>{{ formatDate(profile.createdAt) }}</p>
         </div>
       </div>
     </Card>

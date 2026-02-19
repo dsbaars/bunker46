@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useSettingsStore } from '@/stores/settings';
 import { api } from '@/lib/api';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
@@ -9,6 +10,7 @@ import Card from '@/components/ui/Card.vue';
 
 const router = useRouter();
 const auth = useAuthStore();
+const settings = useSettingsStore();
 
 const code = ref('');
 const error = ref('');
@@ -24,6 +26,7 @@ async function handleVerify() {
     auth.setTokens(res.accessToken, res.refreshToken);
     const profile = await api.get<any>('/users/me');
     auth.setUser(profile);
+    await settings.load(res.accessToken);
     router.push('/dashboard');
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Invalid code';

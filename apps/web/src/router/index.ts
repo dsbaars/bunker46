@@ -73,6 +73,12 @@ const router = createRouter({
       component: () => import('../views/SettingsSecurityView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/settings/general',
+      name: 'settings-general',
+      component: () => import('../views/SettingsGeneralView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 });
 

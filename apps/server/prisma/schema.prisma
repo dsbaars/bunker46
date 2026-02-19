@@ -10,10 +10,11 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   username     String   @unique
-  email        String?  @unique
   passwordHash String   @map("password_hash")
   totpSecret   String?  @map("totp_secret")
   totpEnabled  Boolean  @default(false) @map("totp_enabled")
+  dateFormat   String   @default("MM/DD/YYYY") @map("date_format")
+  timeFormat   String   @default("12h") @map("time_format")
   role         Role     @default(USER)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")

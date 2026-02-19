@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useSettingsStore } from '@/stores/settings';
 import { api } from '@/lib/api';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
@@ -9,9 +10,9 @@ import Card from '@/components/ui/Card.vue';
 
 const router = useRouter();
 const auth = useAuthStore();
+const settings = useSettingsStore();
 
 const username = ref('');
-const email = ref('');
 const password = ref('');
 const confirmPassword = ref('');
 const error = ref('');
@@ -28,9 +29,9 @@ async function handleRegister() {
     const res = await api.post<{ accessToken: string; refreshToken: string }>('/auth/register', {
       username: username.value,
       password: password.value,
-      email: email.value || undefined,
     });
     auth.setTokens(res.accessToken, res.refreshToken);
+    await settings.load(res.accessToken);
     router.push('/dashboard');
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Registration failed';
@@ -62,15 +63,6 @@ async function handleRegister() {
             v-model="username"
             placeholder="Choose a username"
             autocomplete="username"
-          />
-        </div>
-        <div>
-          <label class="text-sm font-medium mb-1.5 block">Email (optional)</label>
-          <Input
-            v-model="email"
-            type="email"
-            placeholder="your@email.com"
-            autocomplete="email"
           />
         </div>
         <div>

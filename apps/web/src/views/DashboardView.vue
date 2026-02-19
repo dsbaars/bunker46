@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { api } from '@/lib/api';
+import { useFormatting } from '@/composables/useFormatting';
 import type { DashboardStatsDto } from '@bunker46/shared-types';
 import StatCard from '@/components/ui/StatCard.vue';
 import Card from '@/components/ui/Card.vue';
@@ -8,6 +9,7 @@ import Badge from '@/components/ui/Badge.vue';
 
 const stats = ref<DashboardStatsDto | null>(null);
 const loading = ref(true);
+const { formatDateTime } = useFormatting();
 
 onMounted(async () => {
   try {
@@ -170,7 +172,7 @@ function resultBadgeVariant(result: string) {
                   </Badge>
                 </td>
                 <td class="py-2.5 text-muted-foreground">
-                  {{ new Date(item.timestamp).toLocaleString() }}
+                  {{ formatDateTime(item.timestamp) }}
                 </td>
               </tr>
             </tbody>

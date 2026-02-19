@@ -1,8 +1,20 @@
-import { Controller, Post, Body, UseGuards, Req, HttpCode, HttpStatus, Get } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Delete,
+  Body,
+  UseGuards,
+  Req,
+  HttpCode,
+  HttpStatus,
+  Get,
+  Param,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import type { AuthService } from './auth.service.js';
 import type { TotpService } from './totp.service.js';
 import type { PasskeyService } from './passkey.service.js';
+import type { UsersService } from '../users/users.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import type { FastifyRequest } from 'fastify';
 
@@ -13,11 +25,12 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly totpService: TotpService,
     private readonly passkeyService: PasskeyService,
+    private readonly usersService: UsersService,
   ) {}
 
   @Post('register')
-  async register(@Body() body: { username: string; password: string; email?: string }) {
-    return this.authService.register(body.username, body.password, body.email);
+  async register(@Body() body: { username: string; password: string }) {
+    return this.authService.register(body.username, body.password);
   }
 
   @Post('login')
@@ -60,6 +73,15 @@ export class AuthController {
     if (!valid) return { success: false, message: 'Invalid TOTP code' };
 
     await this.totpService.enableTotp(req.user.sub, body.secret);
+    return { success: true };
+  }
+
+  @Delete('totp')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async disableTotp(@Req() req: FastifyRequest & { user: { sub: string } }) {
+    await this.usersService.disableTotp(req.user.sub);
     return { success: true };
   }
 
@@ -111,6 +133,25 @@ export class AuthController {
   async passkeyLoginVerify(@Body() body: { userId: string; response: any }) {
     const result = await this.passkeyService.verifyAuthentication(body.userId, body.response);
     if (!result.verified) return { verified: false };
-    return { verified: true, ...(await this.authService.register(body.userId, '')) };
+    return { verified: true, ...(await this.authService.loginWithPasskey(body.userId)) };
+  }
+
+  @Get('passkey')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async listPasskeys(@Req() req: FastifyRequest & { user: { sub: string } }) {
+    return this.passkeyService.listPasskeys(req.user.sub);
+  }
+
+  @Delete('passkey/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async deletePasskey(
+    @Req() req: FastifyRequest & { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    await this.passkeyService.deletePasskey(req.user.sub, id);
+    return { success: true };
   }
 }

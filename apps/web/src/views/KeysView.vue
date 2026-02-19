@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { api } from '@/lib/api';
+import { useUiStore } from '@/stores/ui';
+import { useFormatting } from '@/composables/useFormatting';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
+import Badge from '@/components/ui/Badge.vue';
 import Input from '@/components/ui/Input.vue';
 
 interface NsecKey {
@@ -13,6 +16,7 @@ interface NsecKey {
 }
 
 const keys = ref<NsecKey[]>([]);
+const npubs = ref<Record<string, string>>({});
 const loading = ref(true);
 const showAddKey = ref(false);
 
@@ -20,6 +24,9 @@ const nsecInput = ref('');
 const labelInput = ref('');
 const addError = ref('');
 const adding = ref(false);
+
+const ui = useUiStore();
+const { formatDate } = useFormatting();
 
 onMounted(async () => {
   await loadKeys();
@@ -29,11 +36,25 @@ async function loadKeys() {
   loading.value = true;
   try {
     keys.value = await api.get<NsecKey[]>('/connections/nsec-keys');
+    await resolveNpubs();
   } catch {
     // ignore
   } finally {
     loading.value = false;
   }
+}
+
+async function resolveNpubs() {
+  const { nip19 } = await import('nostr-tools');
+  const map: Record<string, string> = {};
+  for (const key of keys.value) {
+    try {
+      map[key.id] = nip19.npubEncode(key.publicKey);
+    } catch {
+      map[key.id] = key.publicKey;
+    }
+  }
+  npubs.value = map;
 }
 
 async function addKey() {
@@ -85,10 +106,15 @@ async function deleteKey(id: string) {
   if (!confirm('Delete this key? This cannot be undone.')) return;
   try {
     await api.delete(`/connections/nsec-keys/${id}`);
+    if (ui.defaultKeyId === id) ui.setDefaultKey(null);
     await loadKeys();
   } catch (err) {
     alert(err instanceof Error ? err.message : 'Failed to delete key');
   }
+}
+
+function setDefault(id: string) {
+  ui.setDefaultKey(ui.defaultKeyId === id ? null : id);
 }
 </script>
 
@@ -172,9 +198,16 @@ async function deleteKey(id: string) {
       v-else
       class="space-y-3"
     >
+      <p
+        v-if="keys.length > 0"
+        class="text-xs text-muted-foreground mb-1"
+      >
+        Star a key to pre-select it when creating connections.
+      </p>
       <Card
         v-for="key in keys"
         :key="key.id"
+        :class="ui.defaultKeyId === key.id ? 'border-primary/50' : ''"
       >
         <div class="flex items-center justify-between gap-4">
           <div class="flex-1 min-w-0">
@@ -182,22 +215,42 @@ async function deleteKey(id: string) {
               <h3 class="font-semibold">
                 {{ key.label }}
               </h3>
+              <Badge
+                v-if="ui.defaultKeyId === key.id"
+                variant="default"
+              >
+                Default
+              </Badge>
             </div>
             <p class="text-xs text-muted-foreground font-mono truncate">
-              {{ key.publicKey }}
+              {{ npubs[key.id] || key.publicKey }}
             </p>
             <p class="text-xs text-muted-foreground mt-1">
-              Added {{ new Date(key.createdAt).toLocaleDateString() }}
+              Added {{ formatDate(key.createdAt) }}
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="text-destructive hover:text-destructive shrink-0"
-            @click="deleteKey(key.id)"
-          >
-            Delete
-          </Button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              :title="ui.defaultKeyId === key.id ? 'Unset as default' : 'Set as default'"
+              class="text-lg transition-colors cursor-pointer"
+              :class="
+                ui.defaultKeyId === key.id
+                  ? 'text-yellow-400'
+                  : 'text-muted-foreground hover:text-yellow-400'
+              "
+              @click="setDefault(key.id)"
+            >
+              ★
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="text-destructive hover:text-destructive"
+              @click="deleteKey(key.id)"
+            >
+              Delete
+            </Button>
+          </div>
         </div>
       </Card>
     </div>

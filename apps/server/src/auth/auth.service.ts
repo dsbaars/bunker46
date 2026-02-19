@@ -20,9 +20,14 @@ export class AuthService {
     private readonly totpService: TotpService,
   ) {}
 
-  async register(username: string, password: string, email?: string) {
-    const user = await this.usersService.create(username, password, email);
+  async register(username: string, password: string) {
+    const user = await this.usersService.create(username, password);
     return this.createTokens(user.id, user.username, false);
+  }
+
+  async loginWithPasskey(userId: string) {
+    const user = await this.usersService.findById(userId);
+    return this.createTokens(user.id, user.username, true);
   }
 
   async login(username: string, password: string) {

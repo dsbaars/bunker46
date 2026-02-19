@@ -3,12 +3,14 @@ import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
+import { useSettingsStore } from '@/stores/settings';
 import Button from '@/components/ui/Button.vue';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const ui = useUiStore();
+const settingsStore = useSettingsStore();
 const mobileMenuOpen = ref(false);
 
 const showLayout = computed(() => {
@@ -22,10 +24,12 @@ const navItems = [
   { name: 'Connections', path: '/connections', icon: '⇋' },
   { name: 'Relays', path: '/settings/relays', icon: '📡' },
   { name: 'Security', path: '/settings/security', icon: '⚙' },
+  { name: 'General', path: '/settings/general', icon: '◈' },
 ];
 
 function handleLogout() {
   auth.logout();
+  settingsStore.clear();
   router.push('/login');
 }
 </script>
@@ -50,11 +54,11 @@ function handleLogout() {
       ]"
     >
       <div class="flex items-center gap-3 p-4 border-b border-border">
-        <div
-          class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm"
+        <img
+          src="/logo.png"
+          alt="Bunker46"
+          class="w-8 h-8 rounded-lg object-contain shrink-0"
         >
-          B
-        </div>
         <span
           v-if="!ui.sidebarCollapsed"
           class="font-semibold text-lg"

@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '@/lib/api';
+import { useFormatting } from '@/composables/useFormatting';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Badge from '@/components/ui/Badge.vue';
@@ -145,8 +146,9 @@ function resultVariant(result: string) {
   }
 }
 
+const { formatDateTime } = useFormatting();
 function formatTime(ts: string) {
-  return new Date(ts).toLocaleString();
+  return formatDateTime(ts);
 }
 </script>
 
