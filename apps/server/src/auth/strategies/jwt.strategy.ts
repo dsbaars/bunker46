@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-jwt';
 import type { FastifyRequest } from 'fastify';
@@ -8,9 +8,8 @@ interface JwtPayload {
   username: string;
   totpVerified: boolean;
   sessionId?: string;
+  role?: string;
 }
-
-const secret = process.env['JWT_SECRET'] ?? 'dev-secret-change-me';
 
 type RequestWithHeaders = FastifyRequest & {
   raw?: { headers?: Record<string, string | string[] | undefined> };
@@ -30,7 +29,7 @@ function jwtFromRequest(req: RequestWithHeaders): string | null {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(@Inject('JWT_SECRET') secret: string) {
     super({
       jwtFromRequest,
       ignoreExpiration: false,
@@ -45,6 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       username: payload.username,
       totpVerified: payload.totpVerified,
       sessionId: payload.sessionId,
+      role: payload.role,
     };
   }
 }

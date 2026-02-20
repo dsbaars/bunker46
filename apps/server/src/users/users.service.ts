@@ -34,6 +34,10 @@ export class UsersService {
     return user;
   }
 
+  async getPasskeyCount(userId: string): Promise<number> {
+    return this.prisma.passkey.count({ where: { userId } });
+  }
+
   async verifyPassword(user: User, password: string): Promise<boolean> {
     return argon2.verify(user.passwordHash, password);
   }

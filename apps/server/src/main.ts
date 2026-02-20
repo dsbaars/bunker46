@@ -14,6 +14,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import fastifyHelmet from '@fastify/helmet';
 import { AppModule } from './app.module.js';
 import { serverEnvSchema } from '@bunker46/config';
 
@@ -26,6 +27,8 @@ async function bootstrap() {
       logger: env.NODE_ENV === 'development',
     }),
   );
+
+  await app.getHttpAdapter().getInstance().register(fastifyHelmet);
 
   app.enableCors({
     origin: env.CORS_ORIGINS.split(',').map((o) => o.trim()),

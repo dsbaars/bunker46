@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { LogResult } from '@/generated/prisma/client.js';
+import type { Prisma } from '@/generated/prisma/client.js';
 
 interface LogEntry {
   connectionId: string;
@@ -28,7 +29,7 @@ export class LoggingService {
           result: entry.result as LogResult,
           durationMs: entry.durationMs,
           errorMessage: entry.errorMessage,
-          metadata: (entry.metadata ?? undefined) as any,
+          metadata: (entry.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
         },
       });
     } catch (err) {
@@ -36,7 +37,15 @@ export class LoggingService {
     }
   }
 
-  async getLogsForConnection(connectionId: string, page = 1, limit = 20) {
+  async getLogsForConnection(connectionId: string, userId: string, page = 1, limit = 20) {
+    const connection = await this.prisma.bunkerConnection.findUnique({
+      where: { id: connectionId },
+      select: { userId: true },
+    });
+    if (!connection || connection.userId !== userId) {
+      throw new NotFoundException('Connection not found');
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.signingLog.findMany({
         where: { connectionId },

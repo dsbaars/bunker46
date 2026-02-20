@@ -20,12 +20,14 @@ export class LoggingController {
 
   @Get('connections/:id/logs')
   async getConnectionLogs(
+    @Req() req: AuthReq,
     @Param('id') id: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.loggingService.getLogsForConnection(
       id,
+      req.user.sub,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
     );

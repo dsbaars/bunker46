@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { serverEnvSchema } from '@bunker46/config';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
@@ -13,14 +14,29 @@ import { EncryptionService } from '../common/crypto/encryption.service.js';
   imports: [
     UsersModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: process.env['JWT_SECRET'] ?? 'dev-secret-change-me',
-      signOptions: {
-        expiresIn: (process.env['JWT_EXPIRES_IN'] ?? '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`,
+    JwtModule.registerAsync({
+      useFactory: () => {
+        const env = serverEnvSchema.parse(process.env);
+        return {
+          secret: env.JWT_SECRET,
+          signOptions: {
+            expiresIn: env.JWT_EXPIRES_IN as `${number}${'s' | 'm' | 'h' | 'd'}`,
+          },
+        };
       },
     }),
   ],
-  providers: [AuthService, JwtStrategy, TotpService, PasskeyService, EncryptionService],
+  providers: [
+    {
+      provide: 'JWT_SECRET',
+      useFactory: () => serverEnvSchema.parse(process.env).JWT_SECRET,
+    },
+    AuthService,
+    JwtStrategy,
+    TotpService,
+    PasskeyService,
+    EncryptionService,
+  ],
   controllers: [AuthController],
   exports: [AuthService, JwtModule],
 })

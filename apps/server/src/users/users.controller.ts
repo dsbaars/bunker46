@@ -17,9 +17,7 @@ export class UsersController {
     @Req() req: FastifyRequest & { user: { sub: string } },
   ): Promise<UserProfileDto> {
     const user = await this.usersService.findById(req.user.sub);
-    const passkeysCount = await (this.usersService as any).prisma.passkey.count({
-      where: { userId: user.id },
-    });
+    const passkeysCount = await this.usersService.getPasskeyCount(user.id);
     return {
       id: user.id,
       username: user.username,

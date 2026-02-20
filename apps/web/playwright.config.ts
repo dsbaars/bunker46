@@ -28,7 +28,7 @@ export default defineConfig({
         ]
       : [{ name: 'chromium-desktop', use: { ...devices['Desktop Chrome'] } }],
   // CI with E2E_USE_PREVIEW: server is started separately; only start Vite preview (faster than pnpm dev).
-  // Local: start full stack with pnpm dev.
+  // Local: start full stack with pnpm dev. E2E=1 relaxes server rate limits so tests do not hit throttling.
   webServer: process.env['E2E_USE_PREVIEW']
     ? {
         command: 'pnpm exec vite preview --port 5173',

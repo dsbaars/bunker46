@@ -41,8 +41,20 @@ export async function registerAndLogin(
   await page.getByPlaceholder('At least 8 characters').fill(password);
   await page.getByPlaceholder('Repeat password').fill(password);
   await page.getByRole('button', { name: 'Create Account' }).click();
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 5000 });
+  try {
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 5000 });
+  } catch (err) {
+    const errText = await page
+      .locator('.text-destructive')
+      .first()
+      .textContent()
+      .catch(() => '');
+    throw new Error(
+      `Register did not redirect to dashboard.${errText ? ` Page error: ${errText.trim()}` : ''}`,
+      { cause: err },
+    );
+  }
 
   return { username, password };
 }
@@ -57,7 +69,7 @@ export async function login(page: Page, username: string, password: string) {
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   try {
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
-  } catch {
+  } catch (err) {
     const errText = await page
       .locator('.text-destructive')
       .first()
@@ -65,6 +77,7 @@ export async function login(page: Page, username: string, password: string) {
       .catch(() => '');
     throw new Error(
       `Login did not redirect to dashboard.${errText ? ` Page error: ${errText.trim()}` : ''}`,
+      { cause: err },
     );
   }
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 5000 });

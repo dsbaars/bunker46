@@ -22,6 +22,7 @@
   "dependencies": {
     "@bunker46/config": "workspace:*",
     "@bunker46/shared-types": "workspace:*",
+    "@fastify/helmet": "^13.0.2",
     "@fastify/static": "^9.0.0",
     "@nestjs/common": "^11.1.14",
     "@nestjs/core": "^11.1.14",
@@ -29,6 +30,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-fastify": "^11.1.14",
     "@nestjs/swagger": "^11.2.6",
+    "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.0.0",
     "@prisma/client": "^7.0.0",
     "@simplewebauthn/server": "^13.2.2",

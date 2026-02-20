@@ -22,6 +22,13 @@ export const serverEnvSchema = z.object({
   WEBAUTHN_ORIGIN: z.string().default('http://localhost:5173'),
 
   REDIS_URL: z.string().url().optional(),
+
+  /** When "false" or "0", new user registration is disabled (backend and frontend). */
+  ALLOW_REGISTRATION: z
+    .string()
+    .optional()
+    .default('true')
+    .transform((s) => s !== 'false' && s !== '0'),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

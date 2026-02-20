@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore } from '@/stores/settings';
+import { useAuthConfig } from '@/composables/useAuthConfig';
 import { api } from '@/lib/api';
 import type { UserProfileDto } from '@bunker46/shared-types';
 import {
@@ -16,6 +17,11 @@ import Card from '@/components/ui/Card.vue';
 const router = useRouter();
 const auth = useAuthStore();
 const settings = useSettingsStore();
+const { config: authConfig, load: loadAuthConfig } = useAuthConfig();
+
+onMounted(() => {
+  loadAuthConfig();
+});
 
 const username = ref('');
 const password = ref('');
@@ -203,7 +209,10 @@ async function handlePasskeyLogin() {
         </p>
       </div>
 
-      <div class="mt-4 text-center text-sm text-muted-foreground">
+      <div
+        v-if="authConfig?.registrationEnabled !== false"
+        class="mt-4 text-center text-sm text-muted-foreground"
+      >
         Don't have an account?
         <router-link to="/register" class="text-primary hover:underline"> Register </router-link>
       </div>

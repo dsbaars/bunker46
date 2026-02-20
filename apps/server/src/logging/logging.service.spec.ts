@@ -8,6 +8,9 @@ describe('LoggingService', () => {
 
   beforeEach(() => {
     prisma = {
+      bunkerConnection: {
+        findUnique: vi.fn().mockResolvedValue({ userId: 'user-1' }),
+      },
       signingLog: {
         create: vi.fn().mockResolvedValue({ id: 'log-1' }),
         findMany: vi.fn().mockResolvedValue([]),
@@ -67,7 +70,7 @@ describe('LoggingService', () => {
         } as never,
       ]);
       vi.mocked(prisma.signingLog!.count!).mockResolvedValue(25);
-      const result = await service.getLogsForConnection('conn-1', 2, 10);
+      const result = await service.getLogsForConnection('conn-1', 'user-1', 2, 10);
       expect(result).toEqual({
         data: expect.any(Array),
         total: 25,
@@ -84,9 +87,23 @@ describe('LoggingService', () => {
     });
 
     it('should use default page and limit', async () => {
-      await service.getLogsForConnection('conn-1');
+      await service.getLogsForConnection('conn-1', 'user-1');
       expect(prisma.signingLog?.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 0, take: 20 }),
+      );
+    });
+
+    it('should throw NotFoundException when connection does not exist or belongs to another user', async () => {
+      vi.mocked(prisma.bunkerConnection!.findUnique!).mockResolvedValue(null);
+      await expect(service.getLogsForConnection('conn-1', 'user-1')).rejects.toThrow(
+        'Connection not found',
+      );
+
+      vi.mocked(prisma.bunkerConnection!.findUnique!).mockResolvedValue({
+        userId: 'other-user',
+      } as never);
+      await expect(service.getLogsForConnection('conn-1', 'user-1')).rejects.toThrow(
+        'Connection not found',
       );
     });
   });

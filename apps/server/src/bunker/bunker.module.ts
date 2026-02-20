@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { AdminGuard } from '../auth/guards/admin.guard.js';
 import { BunkerService } from './bunker.service.js';
 import { BunkerGateway } from './bunker.gateway.js';
 import { BunkerUriService } from './bunker-uri.service.js';
@@ -11,7 +12,14 @@ import { BunkerController } from './bunker.controller.js';
 
 @Module({
   imports: [forwardRef(() => ConnectionsModule), LoggingModule, EventsModule],
-  providers: [BunkerService, BunkerGateway, BunkerUriService, BunkerRpcHandler, EncryptionService],
+  providers: [
+    AdminGuard,
+    BunkerService,
+    BunkerGateway,
+    BunkerUriService,
+    BunkerRpcHandler,
+    EncryptionService,
+  ],
   controllers: [BunkerController],
   exports: [BunkerService],
 })

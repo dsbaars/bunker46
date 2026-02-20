@@ -5,7 +5,7 @@ import { hexToBytes } from '@noble/hashes/utils.js';
 import * as nip44 from 'nostr-tools/nip44';
 import * as nip04 from 'nostr-tools/nip04';
 import { BunkerRpcHandler } from './bunker-rpc.handler.js';
-import { Nip46RequestSchema } from '@bunker46/shared-types';
+import { Nip46RequestSchema, SafeRelayUrlSchema } from '@bunker46/shared-types';
 import { NOSTR_CONSTANTS } from '@bunker46/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
@@ -109,7 +109,19 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   startListeningForKey(signerPubkeyHex: string, signerNsecHex: string, relays: string[]): void {
-    const effectiveRelays = relays.length > 0 ? relays : [...NOSTR_CONSTANTS.DEFAULT_RELAYS];
+    const rawRelays = relays.length > 0 ? relays : [...NOSTR_CONSTANTS.DEFAULT_RELAYS];
+    const effectiveRelays = rawRelays.filter((url) => {
+      const result = SafeRelayUrlSchema.safeParse(url);
+      if (!result.success) {
+        this.logger.warn(`Skipping unsafe relay URL (SSRF): ${url.slice(0, 50)}...`);
+        return false;
+      }
+      return true;
+    });
+    if (effectiveRelays.length === 0) {
+      this.logger.warn('No safe relay URLs left after filtering; using defaults');
+      effectiveRelays.push(...NOSTR_CONSTANTS.DEFAULT_RELAYS);
+    }
 
     const existing = this.activeListeners.get(signerPubkeyHex);
     if (existing) {
@@ -181,7 +193,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleIncomingEvent(
-    event: any,
+    event: { pubkey: string; content: string },
     signerNsecHex: string,
     signerPubkeyHex: string,
     relays: string[],

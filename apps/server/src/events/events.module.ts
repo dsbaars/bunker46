@@ -1,14 +1,20 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { serverEnvSchema } from '@bunker46/config';
 import { EventsController } from './events.controller.js';
 import { EventsService } from './events.service.js';
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: process.env['JWT_SECRET'] ?? 'dev-secret-change-me',
-      signOptions: {
-        expiresIn: (process.env['JWT_EXPIRES_IN'] ?? '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`,
+    JwtModule.registerAsync({
+      useFactory: () => {
+        const env = serverEnvSchema.parse(process.env);
+        return {
+          secret: env.JWT_SECRET,
+          signOptions: {
+            expiresIn: env.JWT_EXPIRES_IN as `${number}${'s' | 'm' | 'h' | 'd'}`,
+          },
+        };
       },
     }),
   ],

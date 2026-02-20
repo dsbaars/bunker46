@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   Delete,
@@ -9,8 +10,12 @@ import {
   HttpStatus,
   Get,
   Param,
+  ForbiddenException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { LoginRequestSchema, RegisterRequestSchema } from '@bunker46/shared-types';
+import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { AuthService } from './auth.service.js';
 import { TotpService } from './totp.service.js';
 import { PasskeyService } from './passkey.service.js';
@@ -23,10 +28,18 @@ function sessionContextFromRequest(req: FastifyRequest): {
   userAgent?: string;
 } {
   const ip =
-    typeof req.ip === 'string' ? req.ip : ((req as any).socket?.remoteAddress ?? undefined);
+    typeof req.ip === 'string'
+      ? req.ip
+      : ((req as FastifyRequest & { socket?: { remoteAddress?: string } }).socket?.remoteAddress ??
+        undefined);
   const userAgent =
     typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined;
   return { ipAddress: ip, userAgent };
+}
+
+function isRegistrationAllowed(): boolean {
+  const v = process.env['ALLOW_REGISTRATION'];
+  return v !== 'false' && v !== '0';
 }
 
 @ApiTags('auth')
@@ -39,15 +52,41 @@ export class AuthController {
     private readonly usersService: UsersService,
   ) {}
 
+  @Get('config')
+  getAuthConfig() {
+    return { registrationEnabled: isRegistrationAllowed() };
+  }
+
   @Post('register')
-  async register(@Req() req: FastifyRequest, @Body() body: { username: string; password: string }) {
-    return this.authService.register(body.username, body.password, sessionContextFromRequest(req));
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
+  async register(@Req() req: FastifyRequest, @Body() body: unknown) {
+    if (!isRegistrationAllowed()) {
+      throw new ForbiddenException('Registration is disabled');
+    }
+    const parsed = RegisterRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten().fieldErrors as Record<string, string[]>);
+    }
+    return this.authService.register(
+      parsed.data.username,
+      parsed.data.password,
+      sessionContextFromRequest(req),
+    );
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Req() req: FastifyRequest, @Body() body: { username: string; password: string }) {
-    return this.authService.login(body.username, body.password, sessionContextFromRequest(req));
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
+  async login(@Req() req: FastifyRequest, @Body() body: unknown) {
+    const parsed = LoginRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten().fieldErrors as Record<string, string[]>);
+    }
+    return this.authService.login(
+      parsed.data.username,
+      parsed.data.password,
+      sessionContextFromRequest(req),
+    );
   }
 
   @Post('totp/verify')
@@ -99,6 +138,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   async refresh(@Req() req: FastifyRequest, @Body() body: { refreshToken: string }) {
     return this.authService.refreshTokens(body.refreshToken, sessionContextFromRequest(req));
   }
@@ -155,7 +195,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async passkeyRegisterVerify(
     @Req() req: FastifyRequest & { user: { sub: string } },
-    @Body() body: any,
+    @Body() body: RegistrationResponseJSON,
   ) {
     const result = await this.passkeyService.verifyRegistration(req.user.sub, body);
     return { verified: result.verified };
@@ -163,15 +203,17 @@ export class AuthController {
 
   @Post('passkey/login/options')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   async passkeyLoginOptions(@Body() body: { username?: string }) {
     return this.passkeyService.generateAuthenticationOptions(body.username);
   }
 
   @Post('passkey/login/verify')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   async passkeyLoginVerify(
     @Req() req: FastifyRequest,
-    @Body() body: { userId?: string; response: any },
+    @Body() body: { userId?: string; response: AuthenticationResponseJSON },
   ) {
     const { verification, userId } = await this.passkeyService.verifyAuthentication(
       body.response,

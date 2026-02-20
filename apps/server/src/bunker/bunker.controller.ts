@@ -1,5 +1,7 @@
-import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException, Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { SafeRelayUrlsSchema } from '@bunker46/shared-types';
+import { AdminGuard } from '../auth/guards/admin.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { TotpVerifiedGuard } from '../auth/guards/totp-verified.guard.js';
 import { BunkerService } from './bunker.service.js';
@@ -64,14 +66,22 @@ export class BunkerController {
   }
 
   @Post('relays')
+  @UseGuards(AdminGuard)
   async setRelays(@Req() req: AuthReq, @Body() body: { relays: string[] }) {
+    const parsed = SafeRelayUrlsSchema.safeParse(body.relays ?? []);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.flatten().formErrors.join(' ') || 'Invalid relay URLs',
+      );
+    }
+    const relays = parsed.data;
     await this.prisma.relayConfig.deleteMany({});
-    if (body.relays.length > 0) {
+    if (relays.length > 0) {
       await this.prisma.relayConfig.createMany({
-        data: body.relays.map((url) => ({ url })),
+        data: relays.map((url) => ({ url })),
       });
     }
-    return { relays: body.relays };
+    return { relays };
   }
 
   @Get('status')

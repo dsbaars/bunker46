@@ -85,6 +85,7 @@ docker compose -f docker-compose.dev.yml up -d
 # Copy environment config
 cp .env.example .env
 # Optional: set REDIS_URL=redis://localhost:6379 in .env for live dashboard/connections updates
+# Optional: set ALLOW_REGISTRATION=false to disable new user sign-ups (backend returns 403; frontend hides register link)
 
 # Generate Prisma client (required; runs automatically on pnpm install) & run migrations
 pnpm db:generate
@@ -123,6 +124,7 @@ pnpm e2e
 # Run E2E with UI
 pnpm e2e:ui
 
+# When the server is started by Playwright (pnpm dev), rate limiting is skipped for localhost in non-production so E2E does not hit limits. For E2E_USE_PREVIEW, start the server yourself; localhost requests are also skipped when NODE_ENV is not production.
 # Lint (includes security rules)
 pnpm lint
 
@@ -161,6 +163,8 @@ This tool implements the full [NIP-46 Nostr Remote Signing](https://nips.nostr.c
 - HTTP-only secure cookies option
 - Security ESLint rules enforced
 - Non-root Docker containers
+
+**CORS / CSRF:** Keep `CORS_ORIGINS` strict: use explicit origins (e.g. `http://localhost:5173` or your frontend URL), never `*` when credentials are used. Avoid overly broad origins to reduce cross-site request risk; consider SameSite cookie attributes and CSRF tokens for critical state-changing actions.
 
 ## Dependencies
 

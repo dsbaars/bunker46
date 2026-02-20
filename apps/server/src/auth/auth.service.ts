@@ -10,6 +10,7 @@ interface JwtPayload {
   username: string;
   totpVerified: boolean;
   sessionId?: string;
+  role?: string;
 }
 
 @Injectable()
@@ -27,7 +28,7 @@ export class AuthService {
     sessionContext?: { ipAddress?: string; userAgent?: string },
   ) {
     const user = await this.usersService.create(username, password);
-    return this.createTokens(user.id, user.username, false, sessionContext);
+    return this.createTokens(user.id, user.username, false, sessionContext, user.role);
   }
 
   async loginWithPasskey(
@@ -35,7 +36,7 @@ export class AuthService {
     sessionContext?: { ipAddress?: string; userAgent?: string },
   ) {
     const user = await this.usersService.findById(userId);
-    return this.createTokens(user.id, user.username, true, sessionContext);
+    return this.createTokens(user.id, user.username, true, sessionContext, user.role);
   }
 
   async login(
@@ -59,7 +60,7 @@ export class AuthService {
       };
     }
 
-    return this.createTokens(user.id, user.username, true, sessionContext);
+    return this.createTokens(user.id, user.username, true, sessionContext, user.role);
   }
 
   async verifyTotp(
@@ -75,7 +76,7 @@ export class AuthService {
     const valid = this.totpService.verifyToken(user.totpSecret, code);
     if (!valid) throw new UnauthorizedException('Invalid TOTP code');
 
-    return this.createTokens(user.id, user.username, true, sessionContext);
+    return this.createTokens(user.id, user.username, true, sessionContext, user.role);
   }
 
   async refreshTokens(
@@ -97,6 +98,7 @@ export class AuthService {
       session.user.username,
       session.totpVerified,
       sessionContext,
+      session.user.role,
     );
   }
 
@@ -143,6 +145,7 @@ export class AuthService {
     username: string,
     totpVerified: boolean,
     sessionContext?: { ipAddress?: string; userAgent?: string },
+    role?: string,
   ) {
     const refreshToken = randomBytes(48).toString('hex');
     const refreshExpiresIn = process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d';
@@ -164,6 +167,7 @@ export class AuthService {
       username,
       totpVerified,
       sessionId: session.id,
+      ...(role && { role }),
     };
     const accessToken = await this.jwtService.signAsync(payload);
 

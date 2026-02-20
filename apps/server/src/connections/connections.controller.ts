@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -19,7 +20,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { TotpVerifiedGuard } from '../auth/guards/totp-verified.guard.js';
 import { ConnectionsService } from './connections.service.js';
 import { BunkerService } from '../bunker/bunker.service.js';
-import { parsePermissionList, type PermissionDescriptor } from '@bunker46/shared-types';
+import {
+  parsePermissionList,
+  SafeRelayUrlsSchema,
+  type PermissionDescriptor,
+} from '@bunker46/shared-types';
 import type { FastifyRequest } from 'fastify';
 
 type AuthReq = FastifyRequest & { user: { sub: string } };
@@ -85,11 +90,21 @@ export class ConnectionsController {
       type?: 'nostrconnect' | 'bunker';
     },
   ) {
+    let validatedRelays: string[] | undefined;
+    if (body.relays != null && body.relays.length > 0) {
+      const parsed = SafeRelayUrlsSchema.safeParse(body.relays);
+      if (!parsed.success) {
+        throw new BadRequestException(
+          parsed.error.flatten().formErrors.join(' ') || 'Invalid relay URLs',
+        );
+      }
+      validatedRelays = parsed.data;
+    }
     const conn = await this.connectionsService.createConnection(
       req.user.sub,
       body.nsecKeyId,
       body.clientPubkey,
-      body,
+      { ...body, relays: validatedRelays ?? body.relays },
     );
 
     if (body.perms) {
@@ -101,14 +116,17 @@ export class ConnectionsController {
       }
     }
 
-    await this.bunkerService.ensureListeningForConnection(body.nsecKeyId, body.relays ?? []);
+    await this.bunkerService.ensureListeningForConnection(
+      body.nsecKeyId,
+      validatedRelays ?? body.relays ?? [],
+    );
 
     if (body.type === 'nostrconnect' && body.secret) {
       await this.bunkerService.sendConnectResponse(
         body.nsecKeyId,
         body.clientPubkey,
         body.secret,
-        body.relays ?? [],
+        validatedRelays ?? body.relays ?? [],
       );
       await this.connectionsService.updateConnectionStatus(conn.id, 'ACTIVE');
     }
