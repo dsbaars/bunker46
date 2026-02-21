@@ -29,6 +29,7 @@
     "lucide-vue-next": "^0.575.0",
     "nanostores": "^1.0.0",
     "nostr-tools": "^2.23.1",
+    "qrcode": "^1.5.4",
     "radix-vue": "^1.9.17",
     "tailwind-merge": "^3.5.0",
     "vue": "^3.5.28",
@@ -37,7 +38,6 @@
   "devDependencies": {
     "@bunker46/eslint-config": "workspace:*",
     "@bunker46/tsconfig": "workspace:*",
-    "sharp": "^0.33.5",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.2.0",
     "@types/node": "^25.0.0",
@@ -47,6 +47,7 @@
     "autoprefixer": "^10.4.24",
     "eslint": "^10.0.0",
     "jsdom": "^28.0.0",
+    "sharp": "^0.33.5",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",

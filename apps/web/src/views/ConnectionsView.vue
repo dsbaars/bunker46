@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
 import { useActivityStream } from '@/composables/useActivityStream';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { Link2, KeyRound, Plug, Lock, Unlock } from 'lucide-vue-next';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
@@ -10,8 +10,10 @@ import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Badge from '@/components/ui/Badge.vue';
 import Input from '@/components/ui/Input.vue';
+import PubkeyDisplay from '@/components/PubkeyDisplay.vue';
 
 const router = useRouter();
+const route = useRoute();
 const ui = useUiStore();
 const { formatDateTime } = useFormatting();
 
@@ -44,6 +46,7 @@ const mode = ref<'idle' | 'generate' | 'import'>('idle');
 const selectedKeyId = ref('');
 const connectionName = ref('');
 const generatedUri = ref('');
+const generatedUriQr = ref('');
 const generating = ref(false);
 const copied = ref(false);
 const error = ref('');
@@ -70,8 +73,20 @@ async function loadConnectionsAndKeys() {
   }
 }
 
-onMounted(() => {
-  loadConnectionsAndKeys();
+/** Check for ?import= or ?nostrconnect= (e.g. from extension redirect) and pre-fill the Use Nostrconnect URI form. */
+function applyImportQuery() {
+  const raw = (route.query.import as string) ?? (route.query.nostrconnect as string) ?? '';
+  const uri = (typeof raw === 'string' ? raw : '').trim();
+  if (!uri.startsWith('nostrconnect://')) return;
+  bunkerUri.value = uri;
+  enterMode('import');
+  // Replace URL without the query so the param does not linger in the address bar
+  router.replace({ path: route.path, query: {} });
+}
+
+onMounted(async () => {
+  await loadConnectionsAndKeys();
+  applyImportQuery();
 });
 
 useActivityStream(() => {
@@ -99,11 +114,30 @@ watch(mode, () => {
   uriPreviewImage.value = '';
 });
 
+// Generate QR code for the bunker URI when it is set
+watch(generatedUri, async (uri) => {
+  if (!uri) {
+    generatedUriQr.value = '';
+    return;
+  }
+  try {
+    const qrcode = await import('qrcode');
+    generatedUriQr.value = await qrcode.toDataURL(uri, {
+      width: 256,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+  } catch {
+    generatedUriQr.value = '';
+  }
+});
+
 function reset() {
   mode.value = 'idle';
   // keep selectedKeyId so the default key stays selected
   connectionName.value = '';
   generatedUri.value = '';
+  generatedUriQr.value = '';
   generating.value = false;
   copied.value = false;
   error.value = '';
@@ -261,11 +295,21 @@ function statusVariant(status: string) {
 
       <div v-else class="space-y-4">
         <div class="p-4 rounded-lg bg-muted/50 border border-border">
-          <p class="text-xs text-muted-foreground mb-2">Copy this URI into your Nostr client:</p>
-          <div
-            class="font-mono text-sm break-all select-all bg-background rounded p-3 border border-border"
-          >
-            {{ generatedUri }}
+          <p class="text-xs text-muted-foreground mb-2">
+            Copy this URI into your Nostr client or scan the QR code:
+          </p>
+          <div class="flex flex-col sm:flex-row items-start gap-4">
+            <img
+              v-if="generatedUriQr"
+              :src="generatedUriQr"
+              alt="Bunker URI QR code"
+              class="w-48 h-48 rounded border border-border bg-white shrink-0"
+            />
+            <div
+              class="font-mono text-sm break-all select-all bg-background rounded p-3 border border-border min-w-0 flex-1"
+            >
+              {{ generatedUri }}
+            </div>
           </div>
         </div>
         <div class="flex gap-3">
@@ -399,8 +443,11 @@ function statusVariant(status: string) {
                 {{ conn.status }}
               </Badge>
             </div>
-            <p class="text-xs text-muted-foreground mt-1 font-mono truncate">
-              {{ conn.nsecKey.label }} · {{ conn.clientPubkey.slice(0, 12) }}...
+            <p class="text-xs text-muted-foreground mt-1 flex items-center gap-1 truncate">
+              <span class="truncate">{{ conn.nsecKey.label }} · </span>
+              <span @click.stop
+                ><PubkeyDisplay :pubkey="conn.clientPubkey" :truncate="true"
+              /></span>
             </p>
             <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
               <span

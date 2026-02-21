@@ -203,6 +203,9 @@ importers:
       nostr-tools:
         specifier: ^2.23.1
         version: 2.23.1(typescript@5.9.3)
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
       radix-vue:
         specifier: ^1.9.17
         version: 1.9.17(vue@3.5.28(typescript@5.9.3))

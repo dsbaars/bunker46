@@ -6,6 +6,7 @@ import { useFormatting } from '@/composables/useFormatting';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Badge from '@/components/ui/Badge.vue';
+import PubkeyDisplay from '@/components/PubkeyDisplay.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -190,13 +191,14 @@ function formatTime(ts: string) {
             {{ connection.status }}
           </Badge>
         </div>
-        <p class="text-sm text-muted-foreground mt-1 font-mono">
-          Client: {{ connection.clientPubkey }}
+        <p class="text-sm text-muted-foreground mt-1">
+          Client: <PubkeyDisplay :pubkey="connection.clientPubkey" />
         </p>
-        <p class="text-sm text-muted-foreground font-mono">
-          Key: {{ connection.nsecKey?.label }} ({{
-            connection.nsecKey?.publicKey?.slice(0, 16)
-          }}...)
+        <p class="text-sm text-muted-foreground">
+          Key: {{ connection.nsecKey?.label }}
+          <template v-if="connection.nsecKey?.publicKey">
+            (<PubkeyDisplay :pubkey="connection.nsecKey.publicKey" :truncate="true" />)
+          </template>
         </p>
         <p v-if="connection.lastActivity" class="text-xs text-muted-foreground mt-1">
           Last activity: {{ formatTime(connection.lastActivity) }}

@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Badge from '@/components/ui/Badge.vue';
 import Input from '@/components/ui/Input.vue';
+import PubkeyDisplay from '@/components/PubkeyDisplay.vue';
 
 interface NsecKey {
   id: string;
@@ -17,7 +18,6 @@ interface NsecKey {
 }
 
 const keys = ref<NsecKey[]>([]);
-const npubs = ref<Record<string, string>>({});
 const loading = ref(true);
 const showAddKey = ref(false);
 
@@ -37,25 +37,11 @@ async function loadKeys() {
   loading.value = true;
   try {
     keys.value = await api.get<NsecKey[]>('/connections/nsec-keys');
-    await resolveNpubs();
   } catch {
     // ignore
   } finally {
     loading.value = false;
   }
-}
-
-async function resolveNpubs() {
-  const { nip19 } = await import('nostr-tools');
-  const map: Record<string, string> = {};
-  for (const key of keys.value) {
-    try {
-      map[key.id] = nip19.npubEncode(key.publicKey);
-    } catch {
-      map[key.id] = key.publicKey;
-    }
-  }
-  npubs.value = map;
 }
 
 async function addKey() {
@@ -184,8 +170,8 @@ function setDefault(id: string) {
               </h3>
               <Badge v-if="ui.defaultKeyId === key.id" variant="default"> Default </Badge>
             </div>
-            <p class="text-xs text-muted-foreground font-mono truncate">
-              {{ npubs[key.id] || key.publicKey }}
+            <p class="text-xs text-muted-foreground truncate">
+              <PubkeyDisplay :pubkey="key.publicKey" />
             </p>
             <p class="text-xs text-muted-foreground mt-1">Added {{ formatDate(key.createdAt) }}</p>
           </div>
