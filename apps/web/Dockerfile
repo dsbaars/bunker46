@@ -16,8 +16,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=deps /app/packages ./packages
 COPY . .
-WORKDIR /app/apps/web
-RUN pnpm run build
+WORKDIR /app
+RUN pnpm --filter @bunker46/web... run build
 
 FROM caddy:2-alpine AS production
 COPY --from=build /app/apps/web/dist /srv

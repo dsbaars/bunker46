@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore } from '@/stores/settings';
 import { useAuthConfig } from '@/composables/useAuthConfig';
@@ -15,12 +15,19 @@ import Input from '@/components/ui/Input.vue';
 import Card from '@/components/ui/Card.vue';
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
+
+const totpEnabledMessage = ref('');
 const settings = useSettingsStore();
 const { config: authConfig, load: loadAuthConfig } = useAuthConfig();
 
 onMounted(() => {
   loadAuthConfig();
+  if (route.query.totpEnabled === '1') {
+    totpEnabledMessage.value = 'Two-factor authentication has been enabled. Please sign in again.';
+    router.replace({ path: '/login' });
+  }
 });
 
 const username = ref('');
@@ -148,6 +155,12 @@ async function handlePasskeyLogin() {
     </div>
 
     <Card>
+      <p
+        v-if="totpEnabledMessage"
+        class="mb-4 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2"
+      >
+        {{ totpEnabledMessage }}
+      </p>
       <form class="space-y-4" @submit.prevent="handleLogin">
         <div>
           <label class="text-sm font-medium mb-1.5 block">Username</label>

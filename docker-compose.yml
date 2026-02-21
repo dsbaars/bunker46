@@ -37,14 +37,17 @@ services:
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://bunker46:bunker46@db:5432/bunker46
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-random-string-at-least-32-chars}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-to-another-random-string-32-chars}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-to-a-secure-encryption-key-min-32}
-      CORS_ORIGINS: http://localhost:8080
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
       REDIS_URL: redis://redis:6379
-      WEBAUTHN_RP_NAME: Bunker46
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Bunker46}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:8080}
-      LOG_LEVEL: info
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
     depends_on:
       db:
         condition: service_healthy

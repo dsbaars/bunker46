@@ -1,9 +1,6 @@
 :8080 {
 	root * /srv
-	file_server
-
 	encode gzip zstd
-
 	header {
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
@@ -12,9 +9,10 @@
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	}
 
-	handle /api/* {
-		reverse_proxy server:3000
+	# route keeps order: API proxy first, then SPA fallback (try_files has higher default order than reverse_proxy)
+	route {
+		reverse_proxy /api* server:3000
+		try_files {path} /index.html
+		file_server
 	}
-
-	try_files {path} /index.html
 }

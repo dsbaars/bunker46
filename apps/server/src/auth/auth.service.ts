@@ -9,6 +9,7 @@ interface JwtPayload {
   sub: string;
   username: string;
   totpVerified: boolean;
+  totpEnabled?: boolean;
   sessionId?: string;
   role?: string;
 }
@@ -28,7 +29,7 @@ export class AuthService {
     sessionContext?: { ipAddress?: string; userAgent?: string },
   ) {
     const user = await this.usersService.create(username, password);
-    return this.createTokens(user.id, user.username, false, sessionContext, user.role);
+    return this.createTokens(user.id, user.username, true, sessionContext, user.role, false);
   }
 
   async loginWithPasskey(
@@ -36,7 +37,14 @@ export class AuthService {
     sessionContext?: { ipAddress?: string; userAgent?: string },
   ) {
     const user = await this.usersService.findById(userId);
-    return this.createTokens(user.id, user.username, true, sessionContext, user.role);
+    return this.createTokens(
+      user.id,
+      user.username,
+      true,
+      sessionContext,
+      user.role,
+      user.totpEnabled,
+    );
   }
 
   async login(
@@ -54,13 +62,18 @@ export class AuthService {
       return {
         requiresTotp: true,
         partialToken: await this.jwtService.signAsync(
-          { sub: user.id, username: user.username, totpVerified: false },
+          {
+            sub: user.id,
+            username: user.username,
+            totpVerified: false,
+            totpEnabled: true,
+          },
           { expiresIn: '5m' },
         ),
       };
     }
 
-    return this.createTokens(user.id, user.username, true, sessionContext, user.role);
+    return this.createTokens(user.id, user.username, true, sessionContext, user.role, false);
   }
 
   async verifyTotp(
@@ -76,7 +89,7 @@ export class AuthService {
     const valid = this.totpService.verifyToken(user.totpSecret, code);
     if (!valid) throw new UnauthorizedException('Invalid TOTP code');
 
-    return this.createTokens(user.id, user.username, true, sessionContext, user.role);
+    return this.createTokens(user.id, user.username, true, sessionContext, user.role, true);
   }
 
   async refreshTokens(
@@ -99,6 +112,7 @@ export class AuthService {
       session.totpVerified,
       sessionContext,
       session.user.role,
+      session.user.totpEnabled,
     );
   }
 
@@ -146,6 +160,7 @@ export class AuthService {
     totpVerified: boolean,
     sessionContext?: { ipAddress?: string; userAgent?: string },
     role?: string,
+    totpEnabled = false,
   ) {
     const refreshToken = randomBytes(48).toString('hex');
     const refreshExpiresIn = process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d';
@@ -166,6 +181,7 @@ export class AuthService {
       sub: userId,
       username,
       totpVerified,
+      totpEnabled,
       sessionId: session.id,
       ...(role && { role }),
     };

@@ -7,6 +7,7 @@ interface JwtPayload {
   sub: string;
   username: string;
   totpVerified: boolean;
+  totpEnabled?: boolean;
   sessionId?: string;
   role?: string;
 }
@@ -43,6 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       sub: payload.sub,
       username: payload.username,
       totpVerified: payload.totpVerified,
+      totpEnabled: payload.totpEnabled ?? false,
       sessionId: payload.sessionId,
       role: payload.role,
     };

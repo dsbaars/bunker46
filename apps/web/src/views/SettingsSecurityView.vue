@@ -86,15 +86,24 @@ async function confirmTotp() {
   totpError.value = '';
   totpLoading.value = true;
   try {
-    const res = await api.post<{ success: boolean; message?: string }>('/auth/totp/enable', {
+    const res = await api.post<{
+      success: boolean;
+      message?: string;
+      requireReauth?: boolean;
+    }>('/auth/totp/enable', {
       secret: totpSetup.value.secret,
       code: totpCode.value,
     });
     if (res.success) {
-      totpEnabled.value = true;
-      totpSuccess.value = 'Two-factor authentication has been enabled.';
       totpSetup.value = null;
       totpCode.value = '';
+      if (res.requireReauth) {
+        auth.logout();
+        router.push({ path: '/login', query: { totpEnabled: '1' } });
+        return;
+      }
+      totpEnabled.value = true;
+      totpSuccess.value = 'Two-factor authentication has been enabled.';
       if (auth.user) auth.setUser({ ...auth.user, totpEnabled: true });
     } else {
       totpError.value = res.message || 'Invalid code';

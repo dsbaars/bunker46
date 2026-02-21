@@ -115,7 +115,7 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async enableTotp(
-    @Req() req: FastifyRequest & { user: { sub: string } },
+    @Req() req: FastifyRequest & { user: { sub: string; sessionId?: string } },
     @Body() body: { secret: string; code: string },
   ) {
     const { verifySync } = await import('otplib');
@@ -124,7 +124,10 @@ export class AuthController {
     if (!valid) return { success: false, message: 'Invalid TOTP code' };
 
     await this.totpService.enableTotp(req.user.sub, body.secret);
-    return { success: true };
+    if (req.user.sessionId) {
+      await this.authService.revokeSession(req.user.sub, req.user.sessionId);
+    }
+    return { success: true, requireReauth: true };
   }
 
   @Delete('totp')
