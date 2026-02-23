@@ -86,6 +86,7 @@ docker compose -f docker-compose.dev.yml up -d
 cp .env.example .env
 # Optional: set REDIS_URL=redis://localhost:6379 in .env for live dashboard/connections updates
 # Optional: set ALLOW_REGISTRATION=false to disable new user sign-ups (backend returns 403; frontend hides register link)
+# Optional: set TRUST_PROXY=true when the API is behind a reverse proxy (e.g. Caddy) so session IPs and rate limiting use the real client IP
 
 # Generate Prisma client (required; runs automatically on pnpm install) & run migrations
 pnpm db:generate
@@ -141,6 +142,8 @@ docker compose up --build
 # Access the application
 open http://localhost:8080
 ```
+
+When running behind a reverse proxy (e.g. Caddy, Nginx), set `TRUST_PROXY=true` (or `1` / `yes`) in the server environment so that session IPs and throttling use the client IP from `X-Forwarded-For` / `X-Real-IP`. Only enable this when the app is only reachable through a trusted proxy.
 
 ## NIP-46 Implementation
 

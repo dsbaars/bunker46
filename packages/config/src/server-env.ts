@@ -29,6 +29,17 @@ export const serverEnvSchema = z.object({
     .optional()
     .default('true')
     .transform((s) => s !== 'false' && s !== '0'),
+
+  /**
+   * When "true", "1", or "yes", trust X-Forwarded-For / X-Real-IP from a reverse proxy (e.g. Caddy).
+   * Enables correct client IP for sessions and throttling. Only enable when the app is behind a proxy
+   * that sets these headers; do not enable if clients can reach the app directly.
+   */
+  TRUST_PROXY: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((s) => s === 'true' || s === '1' || s === 'yes'),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

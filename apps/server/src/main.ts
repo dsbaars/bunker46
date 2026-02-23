@@ -25,6 +25,7 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter({
       logger: env.NODE_ENV === 'development',
+      trustProxy: env.TRUST_PROXY,
     }),
   );
 
