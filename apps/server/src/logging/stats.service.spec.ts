@@ -11,6 +11,7 @@ describe('StatsService', () => {
       session: { count: vi.fn().mockResolvedValue(2) },
       bunkerConnection: {
         count: vi.fn().mockResolvedValueOnce(5).mockResolvedValueOnce(3),
+        findMany: vi.fn().mockResolvedValue([{ name: 'App' }, { name: 'Other' }]),
       },
       signingLog: {
         count: vi.fn().mockResolvedValueOnce(10).mockResolvedValueOnce(42),
@@ -20,17 +21,15 @@ describe('StatsService', () => {
             { method: 'sign_event', _count: { method: 8 } },
             { method: 'ping', _count: { method: 2 } },
           ])
-          .mockResolvedValueOnce([{ eventKind: 1, _count: { eventKind: 5 } }]),
-        findMany: vi.fn().mockResolvedValue([
-          {
-            id: 'log-1',
-            method: 'sign_event',
-            result: 'APPROVED',
-            createdAt: new Date('2026-02-19T12:00:00Z'),
-            connection: { name: 'App' },
-          },
-        ]),
+          .mockResolvedValueOnce([{ eventKind: 1, _count: { eventKind: 5 } }])
+          .mockResolvedValueOnce([{ method: 'sign_event' }, { method: 'ping' }]),
+        findMany: vi.fn(),
       },
+      $queryRaw: vi.fn().mockResolvedValue([
+        { ts: new Date('2026-02-17'), count: BigInt(5) },
+        { ts: new Date('2026-02-18'), count: BigInt(12) },
+        { ts: new Date('2026-02-19'), count: BigInt(25) },
+      ]),
     };
     service = new StatsService(prisma as PrismaService);
   });
@@ -46,15 +45,16 @@ describe('StatsService', () => {
         signingActions7d: 42,
         signingByMethod: { sign_event: 8, ping: 2 },
         signingByKind: { '1': 5 },
+        chartRange: '7d',
+        connectionNames: ['App', 'Other'],
+        methods: ['ping', 'sign_event'],
       });
-      expect(result.recentActivity).toHaveLength(1);
-      expect(result.recentActivity?.[0]).toMatchObject({
-        id: 'log-1',
-        method: 'sign_event',
-        connectionName: 'App',
-        result: 'APPROVED',
-      });
-      expect(result.recentActivity?.[0]?.timestamp).toBeDefined();
+      expect(result.activityBuckets).toHaveLength(7);
+      expect(
+        result.activityBuckets?.every(
+          (b) => typeof b.label === 'string' && typeof b.count === 'number',
+        ),
+      ).toBe(true);
     });
 
     it('should call prisma with userId and time bounds', async () => {
@@ -63,14 +63,14 @@ describe('StatsService', () => {
         expect.objectContaining({ where: expect.objectContaining({ userId: 'user-99' }) }),
       );
       expect(prisma.bunkerConnection?.count).toHaveBeenCalledTimes(2);
+      expect(prisma.bunkerConnection?.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-99' },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      });
       expect(prisma.signingLog?.count).toHaveBeenCalledTimes(2);
-      expect(prisma.signingLog?.groupBy).toHaveBeenCalledTimes(2);
-      expect(prisma.signingLog?.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { connection: { userId: 'user-99' } },
-          take: 10,
-        }),
-      );
+      expect(prisma.signingLog?.groupBy).toHaveBeenCalledTimes(3);
+      expect(prisma.$queryRaw).toHaveBeenCalled();
     });
   });
 });
