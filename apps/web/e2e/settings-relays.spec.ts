@@ -25,9 +25,9 @@ testWithAuth.describe('Settings Relays', () => {
     await page.getByPlaceholder('wss://relay.example.com').fill(testRelay);
     await page.getByRole('button', { name: 'Add' }).click();
     await expect(page.getByText(testRelay)).toBeVisible();
-    // Remove the relay we added
+    // Remove the relay we added (scope to the Active Relays row to avoid matching parent divs)
     await page
-      .locator('div')
+      .locator('div.flex.items-center.justify-between')
       .filter({ hasText: testRelay })
       .getByRole('button', { name: 'Remove' })
       .click();
