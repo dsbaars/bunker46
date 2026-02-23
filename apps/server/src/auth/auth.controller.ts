@@ -54,7 +54,11 @@ export class AuthController {
 
   @Get('config')
   getAuthConfig() {
-    return { registrationEnabled: isRegistrationAllowed() };
+    const loginNotice = process.env['LOGIN_NOTICE']?.trim() || null;
+    return {
+      registrationEnabled: isRegistrationAllowed(),
+      loginNotice,
+    };
   }
 
   @Post('register')

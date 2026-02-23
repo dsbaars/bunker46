@@ -76,6 +76,13 @@ async function handleRegister() {
         <p class="text-muted-foreground mt-2">Set up your Bunker46 account</p>
       </div>
 
+      <div
+        v-if="authConfig?.loginNotice"
+        class="mb-6 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 px-4 py-3 text-sm text-amber-800 dark:text-amber-200"
+      >
+        {{ authConfig.loginNotice }}
+      </div>
+
       <Card>
         <form class="space-y-4" @submit.prevent="handleRegister">
           <div>

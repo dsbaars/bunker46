@@ -2,6 +2,8 @@ import { ref, type Ref } from 'vue';
 
 export interface AuthConfig {
   registrationEnabled: boolean;
+  /** Optional notice to show on login/register (e.g. testing server warning). */
+  loginNotice?: string | null;
 }
 
 let cached: AuthConfig | null = null;

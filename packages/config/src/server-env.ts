@@ -40,6 +40,12 @@ export const serverEnvSchema = z.object({
     .optional()
     .default('false')
     .transform((s) => s === 'true' || s === '1' || s === 'yes'),
+
+  /**
+   * Optional notice shown on the login (and register) page, e.g. to warn that this is a testing
+   * server and data may be deleted. Leave unset or empty to show no notice.
+   */
+  LOGIN_NOTICE: z.string().optional().default(''),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
