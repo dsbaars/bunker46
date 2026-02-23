@@ -37,6 +37,48 @@ export class LoggingService {
     }
   }
 
+  async getDashboardActivity(
+    userId: string,
+    page = 1,
+    limit = 15,
+    connectionName?: string,
+    method?: string,
+  ) {
+    const where: Prisma.SigningLogWhereInput = {
+      connection: {
+        userId,
+        ...(connectionName ? { name: connectionName } : {}),
+      },
+      ...(method ? { method } : {}),
+    };
+
+    const [data, total] = await Promise.all([
+      this.prisma.signingLog.findMany({
+        where,
+        include: { connection: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.signingLog.count({ where }),
+    ]);
+
+    return {
+      data: data.map((log) => ({
+        id: log.id,
+        method: log.method,
+        eventKind: log.eventKind,
+        connectionName: log.connection.name,
+        result: log.result,
+        timestamp: log.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async getLogsForConnection(connectionId: string, userId: string, page = 1, limit = 20) {
     const connection = await this.prisma.bunkerConnection.findUnique({
       where: { id: connectionId },

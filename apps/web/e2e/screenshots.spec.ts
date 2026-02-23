@@ -52,12 +52,50 @@ testWithAuth.describe.configure({ mode: 'serial' });
 testWithAuth.setTimeout(60000);
 
 testWithAuth('capture dashboard', async ({ loggedInPage: page }) => {
-  await page.route('**/api/dashboard/stats', (route) => {
+  await page.route('**/api/dashboard/stats**', (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: dashboardStatsFixture,
+      });
+    }
+    route.continue();
+  });
+  await page.route('**/api/dashboard/activity**', (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: [
+            {
+              id: '1',
+              method: 'sign_event',
+              connectionName: 'Satsback.com',
+              result: 'APPROVED',
+              timestamp: '2026-02-19T21:57:20.108Z',
+            },
+            {
+              id: '2',
+              method: 'get_public_key',
+              connectionName: 'Satsback.com',
+              result: 'APPROVED',
+              timestamp: '2026-02-19T21:57:19.907Z',
+            },
+            {
+              id: '3',
+              method: 'sign_event',
+              connectionName: 'Primal',
+              result: 'APPROVED',
+              timestamp: '2026-02-19T21:57:08.895Z',
+            },
+          ],
+          total: 3,
+          page: 1,
+          limit: 15,
+          totalPages: 1,
+        }),
       });
     }
     route.continue();

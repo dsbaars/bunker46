@@ -22,13 +22,21 @@ export interface DashboardStatsDto {
   signingActions7d: number;
   signingByMethod: Record<string, number>;
   signingByKind: Record<string, number>;
-  recentActivity: Array<{
-    id: string;
-    method: string;
-    connectionName: string;
-    result: string;
-    timestamp: string;
-  }>;
+  activityBuckets: Array<{ label: string; count: number }>;
+  chartRange: '1h' | '24h' | '7d';
+  /** Distinct connection names the user has, for filter dropdowns. */
+  connectionNames: string[];
+  /** Distinct methods seen, for filter dropdowns. */
+  methods: string[];
+}
+
+export interface ActivityLogEntry {
+  id: string;
+  method: string;
+  eventKind?: number | null;
+  connectionName: string;
+  result: string;
+  timestamp: string;
 }
 
 export const ApiErrorSchema = z.object({

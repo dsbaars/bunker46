@@ -34,7 +34,25 @@ export class LoggingController {
   }
 
   @Get('dashboard/stats')
-  async getDashboardStats(@Req() req: AuthReq) {
-    return this.statsService.getDashboardStats(req.user.sub);
+  async getDashboardStats(@Req() req: AuthReq, @Query('range') range?: string) {
+    const validRange = (['1h', '24h', '7d'] as const).find((r) => r === range) ?? '7d';
+    return this.statsService.getDashboardStats(req.user.sub, validRange);
+  }
+
+  @Get('dashboard/activity')
+  async getDashboardActivity(
+    @Req() req: AuthReq,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('connection') connection?: string,
+    @Query('method') method?: string,
+  ) {
+    return this.loggingService.getDashboardActivity(
+      req.user.sub,
+      page ? parseInt(page, 10) : 1,
+      limit ? Math.min(parseInt(limit, 10) || 15, 100) : 15,
+      connection || undefined,
+      method || undefined,
+    );
   }
 }

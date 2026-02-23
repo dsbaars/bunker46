@@ -18,76 +18,23 @@
     "27235": 33,
     "30078": 17
   },
-  "recentActivity": [
-    {
-      "id": "cmlu04mek0006qyssc1ldxrlj",
-      "method": "sign_event",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T21:57:20.108Z"
-    },
-    {
-      "id": "cmlu04m8z0005qyssjam8soo4",
-      "method": "get_public_key",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T21:57:19.907Z"
-    },
-    {
-      "id": "cmlu04dr30004qyssrk912sh2",
-      "method": "sign_event",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T21:57:08.895Z"
-    },
-    {
-      "id": "cmlu04dk80003qysszctsmnw0",
-      "method": "get_public_key",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T21:57:08.648Z"
-    },
-    {
-      "id": "cmlu04dde0002qysswelzjcbh",
-      "method": "switch_relays",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T21:57:08.402Z"
-    },
-    {
-      "id": "cmlttv9xd0005ssh0o5xukymt",
-      "method": "get_public_key",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T19:02:06.337Z"
-    },
-    {
-      "id": "cmlttv9xc0001ssh09fl7k3r2",
-      "method": "get_public_key",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T19:02:06.336Z"
-    },
-    {
-      "id": "cmlttv9xh0007ssh04mjcwzvk",
-      "method": "sign_event",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T19:02:06.332Z"
-    },
-    {
-      "id": "cmlttv9xc0003ssh0glb7t24b",
-      "method": "sign_event",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T19:02:06.327Z"
-    },
-    {
-      "id": "cmlttphr8000jsszjru3n1qkn",
-      "method": "sign_event",
-      "connectionName": "Satsback.com",
-      "result": "APPROVED",
-      "timestamp": "2026-02-19T18:57:36.548Z"
-    }
+  "activityBuckets": [
+    { "label": "Mon", "count": 5 },
+    { "label": "Tue", "count": 12 },
+    { "label": "Wed", "count": 22 },
+    { "label": "Thu", "count": 18 },
+    { "label": "Fri", "count": 30 },
+    { "label": "Sat", "count": 15 },
+    { "label": "Sun", "count": 8 }
+  ],
+  "chartRange": "7d",
+  "connectionNames": ["Satsback.com", "Primal", "Coracle"],
+  "methods": [
+    "connect",
+    "get_public_key",
+    "nip44_decrypt",
+    "nip44_encrypt",
+    "sign_event",
+    "switch_relays"
   ]
 }

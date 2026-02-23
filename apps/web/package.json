@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@bunker46/shared-types": "workspace:*",
+    "chart.js": "^4.5.1",
+    "vue-chartjs": "^5.3.3",
     "@scure/bip32": "^2.0.1",
     "@scure/bip39": "^2.0.1",
     "@nanostores/vue": "^1.0.0",
