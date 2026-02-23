@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TooltipTrigger } from 'radix-vue';
+import { TooltipTrigger } from 'reka-ui';
 </script>
 
 <template>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import { useActivityStream } from '@/composables/useActivityStream';
 import { useRouter, useRoute } from 'vue-router';
-import { Link2, KeyRound, Plug, Lock, Unlock } from 'lucide-vue-next';
+import { Link2, KeyRound, Plug, Lock, Unlock, Search } from 'lucide-vue-next';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';
@@ -26,6 +26,7 @@ interface Connection {
   relays: string[];
   loggingEnabled: boolean;
   lastActivity?: string;
+  createdAt: string;
   nsecKey: { publicKey: string; label: string };
   permissions: Array<{ method: string; kind?: number }>;
   _count: { logs: number };
@@ -41,6 +42,38 @@ interface NsecKey {
 const connections = ref<Connection[]>([]);
 const nsecKeys = ref<NsecKey[]>([]);
 const loading = ref(true);
+
+const searchQuery = ref('');
+type SortOption = 'lastUsed' | 'created' | 'name';
+const sortBy = ref<SortOption>('lastUsed');
+
+const filteredAndSortedConnections = computed(() => {
+  const q = searchQuery.value.toLowerCase().trim();
+  let list = connections.value;
+
+  if (q) {
+    list = list.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.nsecKey.label.toLowerCase().includes(q) ||
+        c.clientPubkey.toLowerCase().includes(q),
+    );
+  }
+
+  return [...list].sort((a, b) => {
+    if (sortBy.value === 'name') {
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    }
+    if (sortBy.value === 'created') {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+    // lastUsed: sort by lastActivity desc, nulls last, then createdAt desc
+    const aTime = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+    const bTime = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+    if (bTime !== aTime) return bTime - aTime;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+});
 
 const mode = ref<'idle' | 'generate' | 'import'>('idle');
 const selectedKeyId = ref('');
@@ -391,6 +424,27 @@ function statusVariant(status: string) {
       </div>
     </Card>
 
+    <!-- Search and sort -->
+    <div
+      v-if="!loading && connections.length > 0 && mode === 'idle'"
+      class="flex flex-col sm:flex-row gap-3 mb-4"
+    >
+      <div class="relative flex-1">
+        <Search
+          class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+        />
+        <Input v-model="searchQuery" placeholder="Search by name, key or pubkey…" class="pl-9" />
+      </div>
+      <select
+        v-model="sortBy"
+        class="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring shrink-0"
+      >
+        <option value="lastUsed">Sort: Last used</option>
+        <option value="created">Sort: Created</option>
+        <option value="name">Sort: Name</option>
+      </select>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="text-muted-foreground">Loading connections...</div>
 
@@ -412,13 +466,21 @@ function statusVariant(status: string) {
       </div>
     </div>
 
+    <!-- No search results -->
+    <div
+      v-else-if="connections.length > 0 && filteredAndSortedConnections.length === 0"
+      class="text-center py-12"
+    >
+      <p class="text-muted-foreground">No connections match your search.</p>
+    </div>
+
     <!-- Connection list -->
     <div
-      v-else-if="connections.length > 0"
+      v-else-if="filteredAndSortedConnections.length > 0"
       class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
     >
       <Card
-        v-for="conn in connections"
+        v-for="conn in filteredAndSortedConnections"
         :key="conn.id"
         class="cursor-pointer hover:border-primary/50 transition-colors"
         @click="router.push(`/connections/${conn.id}`)"

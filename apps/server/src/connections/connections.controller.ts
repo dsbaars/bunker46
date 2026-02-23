@@ -62,6 +62,19 @@ export class ConnectionsController {
     );
   }
 
+  @Patch('nsec-keys/:keyId')
+  async updateNsecKeyLabel(
+    @Req() req: AuthReq,
+    @Param('keyId') keyId: string,
+    @Body() body: { label: string },
+  ) {
+    const label = (body.label ?? '').trim();
+    if (!label || label.length > 100) {
+      throw new BadRequestException('Label must be between 1 and 100 characters');
+    }
+    return this.connectionsService.updateNsecKeyLabel(keyId, req.user.sub, label);
+  }
+
   @Delete('nsec-keys/:keyId')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteNsecKey(@Req() req: AuthReq, @Param('keyId') keyId: string) {

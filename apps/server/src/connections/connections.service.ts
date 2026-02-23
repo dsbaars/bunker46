@@ -140,6 +140,16 @@ export class ConnectionsService {
     await this.prisma.bunkerConnection.delete({ where: { id: connectionId } });
   }
 
+  async updateNsecKeyLabel(nsecKeyId: string, userId: string, label: string) {
+    const key = await this.prisma.nsecKey.findUnique({ where: { id: nsecKeyId } });
+    if (!key || key.userId !== userId) throw new NotFoundException('Key not found');
+    return this.prisma.nsecKey.update({
+      where: { id: nsecKeyId },
+      data: { label },
+      select: { id: true, publicKey: true, label: true, createdAt: true },
+    });
+  }
+
   async deleteNsecKey(nsecKeyId: string, userId: string) {
     const key = await this.prisma.nsecKey.findUnique({ where: { id: nsecKeyId } });
     if (!key || key.userId !== userId) throw new NotFoundException('Key not found');

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TooltipRoot } from 'radix-vue';
+import { TooltipRoot } from 'reka-ui';
 </script>
 
 <template>

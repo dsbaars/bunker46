@@ -7,6 +7,16 @@ import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Badge from '@/components/ui/Badge.vue';
 import PubkeyDisplay from '@/components/PubkeyDisplay.vue';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog';
 
 const route = useRoute();
 const router = useRouter();
@@ -96,10 +106,22 @@ async function reactivateConnection() {
   connection.value.status = 'ACTIVE';
 }
 
-async function deleteConnection() {
-  if (!confirm('Delete this connection permanently?')) return;
-  await api.delete(`/connections/${route.params.id}`);
-  router.push('/connections');
+const deleteConfirmOpen = ref(false);
+const deleting = ref(false);
+
+function promptDeleteConnection() {
+  deleteConfirmOpen.value = true;
+}
+
+async function confirmDeleteConnection() {
+  deleting.value = true;
+  try {
+    await api.delete(`/connections/${route.params.id}`);
+    router.push('/connections');
+  } finally {
+    deleting.value = false;
+    deleteConfirmOpen.value = false;
+  }
 }
 
 async function refreshLogs() {
@@ -167,15 +189,12 @@ function formatTime(ts: string) {
     </div>
 
     <div class="flex flex-col sm:flex-row items-start gap-4 mb-8">
-      <div
-        v-if="connection.logoUrl"
-        class="w-16 h-16 rounded-xl bg-muted overflow-hidden flex-shrink-0"
-      >
+      <div v-if="connection.logoUrl" class="w-16 h-16 rounded-xl bg-muted overflow-hidden shrink-0">
         <img :src="connection.logoUrl" :alt="connection.name" class="w-full h-full object-cover" />
       </div>
       <div
         v-else
-        class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0"
+        class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"
       >
         <span class="text-primary font-bold text-2xl">{{
           connection.name.charAt(0).toUpperCase()
@@ -401,7 +420,7 @@ function formatTime(ts: string) {
             >
               Reactivate Connection
             </Button>
-            <Button variant="destructive" class="w-full" @click="deleteConnection">
+            <Button variant="destructive" class="w-full" @click="promptDeleteConnection">
               Delete Connection
             </Button>
           </div>
@@ -409,4 +428,22 @@ function formatTime(ts: string) {
       </div>
     </div>
   </div>
+
+  <!-- Delete connection confirmation dialog -->
+  <AlertDialog v-model:open="deleteConfirmOpen">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete connection?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This action cannot be undone. The connection will be permanently deleted.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction variant="destructive" @click.prevent="confirmDeleteConnection">
+          {{ deleting ? 'Deleting…' : 'Delete' }}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>

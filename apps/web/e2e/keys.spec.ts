@@ -19,10 +19,16 @@ testWithAuth.describe('Keys Page', () => {
     async ({ loggedInPage: page }) => {
       await page.goto('/keys');
       await expect(page.getByRole('heading', { name: 'Nsec Keys' })).toBeVisible({ timeout: 5000 });
-      await page.getByRole('button', { name: 'Add Key' }).click();
+      // "Import Key" appears in header and empty state; click first to open the import form
+      await page
+        .getByRole('button', { name: /Import Key/i })
+        .first()
+        .click();
       await expect(page.getByRole('heading', { name: 'Import Nsec Key' })).toBeVisible();
       await page.getByPlaceholder('nsec1... or hex private key').fill('invalid-input');
-      await page.getByRole('button', { name: 'Import Key' }).click();
+      // Scope to the import form card so we click the submit button, not the empty-state button
+      const importCard = page.getByRole('heading', { name: 'Import Nsec Key' }).locator('..');
+      await importCard.getByRole('button', { name: /Import Key/i }).click();
       await expect(page.locator('.text-destructive')).toBeVisible({ timeout: 5000 });
       await expect(page.locator('.text-destructive')).toContainText(/valid nsec|Failed to add/);
     },

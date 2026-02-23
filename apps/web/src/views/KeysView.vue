@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Key, Star, Trash2 } from 'lucide-vue-next';
+import { Key, Star, Trash2, Pencil, RefreshCw } from 'lucide-vue-next';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';
+import { deriveNip06Key, generateMnemonic } from '@/lib/nip06';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Badge from '@/components/ui/Badge.vue';
 import Input from '@/components/ui/Input.vue';
 import PubkeyDisplay from '@/components/PubkeyDisplay.vue';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog';
 
 interface NsecKey {
   id: string;
@@ -19,12 +30,36 @@ interface NsecKey {
 
 const keys = ref<NsecKey[]>([]);
 const loading = ref(true);
-const showAddKey = ref(false);
 
+type AddMode = 'none' | 'import' | 'mnemonic';
+const addMode = ref<AddMode>('none');
+
+// --- Import nsec form ---
 const nsecInput = ref('');
 const labelInput = ref('');
 const addError = ref('');
 const adding = ref(false);
+
+// --- NIP-06 mnemonic form ---
+const mnemonicInput = ref('');
+const mnemonicAccountStr = ref('0');
+const mnemonicLabel = ref('');
+const mnemonicError = ref('');
+const mnemonicDeriving = ref(false);
+const mnemonicGenerating = ref(false);
+
+// --- Rename ---
+const renamingKeyId = ref<string | null>(null);
+const renameLabel = ref('');
+const renameError = ref('');
+const renaming = ref(false);
+
+// --- Delete confirmation ---
+const deleteConfirmOpen = ref(false);
+const deleteTargetId = ref<string | null>(null);
+const deleteError = ref('');
+const deleteErrorOpen = ref(false);
+const deleting = ref(false);
 
 const ui = useUiStore();
 const { formatDate } = useFormatting();
@@ -42,6 +77,21 @@ async function loadKeys() {
   } finally {
     loading.value = false;
   }
+}
+
+function openAddMode(mode: AddMode) {
+  addMode.value = mode;
+  nsecInput.value = '';
+  labelInput.value = '';
+  addError.value = '';
+  mnemonicInput.value = '';
+  mnemonicAccountStr.value = '0';
+  mnemonicLabel.value = '';
+  mnemonicError.value = '';
+}
+
+function closeAddMode() {
+  addMode.value = 'none';
 }
 
 async function addKey() {
@@ -78,9 +128,7 @@ async function addKey() {
       label: labelInput.value.trim() || 'Default Key',
     });
 
-    nsecInput.value = '';
-    labelInput.value = '';
-    showAddKey.value = false;
+    closeAddMode();
     await loadKeys();
   } catch (err) {
     addError.value = err instanceof Error ? err.message : 'Failed to add key';
@@ -89,14 +137,91 @@ async function addKey() {
   }
 }
 
-async function deleteKey(id: string) {
-  if (!confirm('Delete this key? This cannot be undone.')) return;
+function handleGenerateMnemonic() {
+  mnemonicGenerating.value = true;
+  try {
+    mnemonicInput.value = generateMnemonic();
+    mnemonicError.value = '';
+  } catch (err) {
+    mnemonicError.value = err instanceof Error ? err.message : 'Failed to generate mnemonic';
+  } finally {
+    mnemonicGenerating.value = false;
+  }
+}
+
+async function addKeyFromMnemonic() {
+  mnemonicError.value = '';
+  mnemonicDeriving.value = true;
+  try {
+    const account = Math.max(0, parseInt(mnemonicAccountStr.value, 10) || 0);
+    const { nsecHex, publicKey } = await deriveNip06Key(mnemonicInput.value, account);
+    await api.post('/connections/nsec-keys', {
+      nsecHex,
+      publicKey,
+      label: mnemonicLabel.value.trim() || 'Mnemonic Key',
+    });
+    closeAddMode();
+    await loadKeys();
+  } catch (err) {
+    mnemonicError.value = err instanceof Error ? err.message : 'Failed to derive key';
+  } finally {
+    mnemonicDeriving.value = false;
+  }
+}
+
+function startRename(key: NsecKey) {
+  renamingKeyId.value = key.id;
+  renameLabel.value = key.label;
+  renameError.value = '';
+}
+
+function cancelRename() {
+  renamingKeyId.value = null;
+  renameLabel.value = '';
+  renameError.value = '';
+}
+
+async function saveRename(id: string) {
+  const label = renameLabel.value.trim();
+  if (!label) {
+    renameError.value = 'Label cannot be empty.';
+    return;
+  }
+  renaming.value = true;
+  renameError.value = '';
+  try {
+    await api.patch(`/connections/nsec-keys/${id}`, { label });
+    renamingKeyId.value = null;
+    await loadKeys();
+  } catch (err) {
+    renameError.value = err instanceof Error ? err.message : 'Failed to rename key';
+  } finally {
+    renaming.value = false;
+  }
+}
+
+function promptDeleteKey(id: string) {
+  deleteTargetId.value = id;
+  deleteConfirmOpen.value = true;
+}
+
+async function confirmDeleteKey() {
+  if (!deleteTargetId.value) return;
+  deleting.value = true;
+  deleteError.value = '';
+  const id = deleteTargetId.value;
   try {
     await api.delete(`/connections/nsec-keys/${id}`);
     if (ui.defaultKeyId === id) ui.setDefaultKey(null);
+    deleteConfirmOpen.value = false;
+    deleteTargetId.value = null;
     await loadKeys();
   } catch (err) {
-    alert(err instanceof Error ? err.message : 'Failed to delete key');
+    deleteError.value = err instanceof Error ? err.message : 'Failed to delete key';
+    deleteConfirmOpen.value = false;
+    deleteErrorOpen.value = true;
+  } finally {
+    deleting.value = false;
   }
 }
 
@@ -109,12 +234,15 @@ function setDefault(id: string) {
   <div>
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">Nsec Keys</h1>
-      <Button @click="showAddKey = !showAddKey">
-        {{ showAddKey ? 'Cancel' : 'Add Key' }}
-      </Button>
+      <div v-if="addMode === 'none'" class="flex gap-2">
+        <Button @click="openAddMode('import')"> Import Key </Button>
+        <Button variant="outline" @click="openAddMode('mnemonic')"> From Mnemonic (NIP-06) </Button>
+      </div>
+      <Button v-else variant="ghost" @click="closeAddMode"> Cancel </Button>
     </div>
 
-    <Card v-if="showAddKey" class="mb-6">
+    <!-- Import nsec form -->
+    <Card v-if="addMode === 'import'" class="mb-6">
       <h2 class="text-lg font-semibold mb-2">Import Nsec Key</h2>
       <p class="text-sm text-muted-foreground mb-4">
         Enter your nsec (bech32 <code class="text-primary">nsec1...</code> or 64-character hex). The
@@ -141,6 +269,65 @@ function setDefault(id: string) {
       </div>
     </Card>
 
+    <!-- NIP-06 mnemonic form -->
+    <Card v-if="addMode === 'mnemonic'" class="mb-6">
+      <h2 class="text-lg font-semibold mb-2">Add Key from Mnemonic (NIP-06)</h2>
+      <p class="text-sm text-muted-foreground mb-4">
+        Derive a Nostr key from a BIP-39 mnemonic seed phrase using the
+        <a
+          href="https://nips.nostr.com/6"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary hover:underline"
+          >NIP-06</a
+        >
+        path <code class="text-primary">m/44'/1237'/&lt;account&gt;'/0/0</code>. The mnemonic is
+        never sent to the server — only the derived hex key is stored.
+      </p>
+      <div class="space-y-3">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-sm font-medium">Mnemonic seed phrase</label>
+            <button
+              class="text-xs text-primary hover:underline flex items-center gap-1 cursor-pointer"
+              type="button"
+              @click="handleGenerateMnemonic"
+            >
+              <RefreshCw class="w-3 h-3" />
+              Generate random
+            </button>
+          </div>
+          <textarea
+            v-model="mnemonicInput"
+            rows="3"
+            placeholder="Enter 12 or 24 BIP-39 words separated by spaces…"
+            class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+          />
+        </div>
+        <div>
+          <label class="text-sm font-medium mb-1.5 block">Account index</label>
+          <Input v-model="mnemonicAccountStr" type="number" min="0" placeholder="0" class="w-24" />
+          <p class="text-xs text-muted-foreground mt-1">
+            Use 0 for the default key. Increment to derive additional keys from the same mnemonic.
+          </p>
+        </div>
+        <div>
+          <label class="text-sm font-medium mb-1.5 block">Label</label>
+          <Input v-model="mnemonicLabel" placeholder="e.g. Main Identity, Bot Key..." />
+        </div>
+        <p v-if="mnemonicError" class="text-sm text-destructive">
+          {{ mnemonicError }}
+        </p>
+        <Button
+          :loading="mnemonicDeriving"
+          :disabled="!mnemonicInput.trim()"
+          @click="addKeyFromMnemonic"
+        >
+          Derive & Import Key
+        </Button>
+      </div>
+    </Card>
+
     <div v-if="loading" class="text-muted-foreground">Loading keys...</div>
 
     <div v-else-if="keys.length === 0" class="text-center py-12">
@@ -150,11 +337,14 @@ function setDefault(id: string) {
       <p class="text-muted-foreground mb-4">
         No nsec keys yet. Add one to start managing connections.
       </p>
-      <Button @click="showAddKey = true"> Add your first key </Button>
+      <div class="flex gap-2 justify-center">
+        <Button @click="openAddMode('import')"> Import key </Button>
+        <Button variant="outline" @click="openAddMode('mnemonic')"> From mnemonic (NIP-06) </Button>
+      </div>
     </div>
 
     <div v-else class="space-y-3">
-      <p v-if="keys.length > 0" class="text-xs text-muted-foreground mb-1">
+      <p class="text-xs text-muted-foreground mb-1">
         Star a key to pre-select it when creating connections.
       </p>
       <Card
@@ -164,12 +354,26 @@ function setDefault(id: string) {
       >
         <div class="flex items-center justify-between gap-4">
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
+            <!-- Rename mode -->
+            <div v-if="renamingKeyId === key.id" class="flex items-center gap-2 mb-1">
+              <Input
+                v-model="renameLabel"
+                class="h-7 text-sm py-0"
+                @keydown.enter="saveRename(key.id)"
+                @keydown.esc="cancelRename"
+              />
+              <Button size="sm" :loading="renaming" @click="saveRename(key.id)"> Save </Button>
+              <Button size="sm" variant="ghost" @click="cancelRename"> Cancel </Button>
+            </div>
+            <div v-else class="flex items-center gap-2 mb-1">
               <h3 class="font-semibold">
                 {{ key.label }}
               </h3>
               <Badge v-if="ui.defaultKeyId === key.id" variant="default"> Default </Badge>
             </div>
+            <p v-if="renamingKeyId === key.id && renameError" class="text-xs text-destructive mb-1">
+              {{ renameError }}
+            </p>
             <p class="text-xs text-muted-foreground truncate">
               <PubkeyDisplay :pubkey="key.publicKey" />
             </p>
@@ -189,10 +393,19 @@ function setDefault(id: string) {
               <Star :class="['w-5 h-5', ui.defaultKeyId === key.id ? 'fill-current' : '']" />
             </button>
             <Button
+              v-if="renamingKeyId !== key.id"
+              variant="ghost"
+              size="sm"
+              @click="startRename(key)"
+            >
+              <Pencil class="w-4 h-4 mr-1.5 shrink-0" />
+              Rename
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               class="text-destructive hover:text-destructive"
-              @click="deleteKey(key.id)"
+              @click="promptDeleteKey(key.id)"
             >
               <Trash2 class="w-4 h-4 mr-1.5 shrink-0" />
               Delete
@@ -202,4 +415,35 @@ function setDefault(id: string) {
       </Card>
     </div>
   </div>
+
+  <!-- Delete confirmation dialog -->
+  <AlertDialog v-model:open="deleteConfirmOpen">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete key?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This action cannot be undone. The key will be permanently removed.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction variant="destructive" @click.prevent="confirmDeleteKey">
+          {{ deleting ? 'Deleting…' : 'Delete' }}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
+  <!-- Delete error dialog -->
+  <AlertDialog v-model:open="deleteErrorOpen">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Could not delete key</AlertDialogTitle>
+        <AlertDialogDescription>{{ deleteError }}</AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogAction @click="deleteErrorOpen = false"> OK </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>

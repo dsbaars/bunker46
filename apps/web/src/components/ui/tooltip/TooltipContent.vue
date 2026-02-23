@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TooltipContent, TooltipPortal } from 'radix-vue';
+import { TooltipContent, TooltipPortal } from 'reka-ui';
 import { cn } from '@/lib/utils';
 
 withDefaults(

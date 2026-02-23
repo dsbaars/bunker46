@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@bunker46/shared-types": "workspace:*",
+    "@scure/bip32": "^2.0.1",
+    "@scure/bip39": "^2.0.1",
     "@nanostores/vue": "^1.0.0",
     "@noble/hashes": "^2.0.1",
     "@simplewebauthn/browser": "^13.2.2",
@@ -30,7 +32,7 @@
     "nanostores": "^1.0.0",
     "nostr-tools": "^2.23.1",
     "qrcode": "^1.5.4",
-    "radix-vue": "^1.9.17",
+    "reka-ui": "^2.8.2",
     "tailwind-merge": "^3.5.0",
     "vue": "^3.5.28",
     "vue-router": "^5.0.0"
