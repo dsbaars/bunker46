@@ -6,11 +6,26 @@ type ChartRange = '1h' | '24h' | '7d';
 
 const FIVE_MIN_MS = 5 * 60 * 1000;
 
+function resolveTimeZone(tz: string | undefined): string {
+  if (!tz || !tz.trim()) return 'UTC';
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz.trim() });
+    return tz.trim();
+  } catch {
+    return 'UTC';
+  }
+}
+
 @Injectable()
 export class StatsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDashboardStats(userId: string, range: ChartRange = '7d'): Promise<DashboardStatsDto> {
+  async getDashboardStats(
+    userId: string,
+    range: ChartRange = '7d',
+    tz?: string,
+  ): Promise<DashboardStatsDto> {
+    const timeZone = resolveTimeZone(tz);
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -73,7 +88,13 @@ export class StatsService {
       }
     }
 
-    const activityBuckets = await this.buildActivityBuckets(userId, range, now, rangeStart);
+    const activityBuckets = await this.buildActivityBuckets(
+      userId,
+      range,
+      now,
+      rangeStart,
+      timeZone,
+    );
 
     return {
       activeSessions,
@@ -95,7 +116,10 @@ export class StatsService {
     range: ChartRange,
     now: Date,
     rangeStart: Date,
+    timeZone: string,
   ): Promise<Array<{ label: string; count: number }>> {
+    const localeOpts = { timeZone };
+
     if (range === '7d') {
       const rows = await this.prisma.$queryRaw<Array<{ ts: Date; count: bigint }>>`
         SELECT DATE(sl.created_at) AS ts, COUNT(*) AS count
@@ -118,7 +142,7 @@ export class StatsService {
         const date = d.toISOString().split('T')[0]!;
         const label = new Date(date + 'T12:00:00Z').toLocaleDateString('en', {
           weekday: 'short',
-          timeZone: 'UTC',
+          ...localeOpts,
         });
         return { label, count: map.get(date) ?? 0 };
       });
@@ -149,6 +173,7 @@ export class StatsService {
           hour: '2-digit',
           minute: '2-digit',
           hour12: false,
+          ...localeOpts,
         });
         return { label, count: map.get(key) ?? 0 };
       });
@@ -179,6 +204,7 @@ export class StatsService {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
+        ...localeOpts,
       });
       return { label, count: map.get(slotMs) ?? 0 };
     });

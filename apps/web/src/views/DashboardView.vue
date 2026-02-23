@@ -39,7 +39,10 @@ async function loadStats(range: ChartRange = chartRange.value, isRangeSwitch = f
   if (isRangeSwitch) chartLoading.value = true;
   else loading.value = true;
   try {
-    stats.value = await api.get<DashboardStatsDto>(`/dashboard/stats?range=${range}`);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    stats.value = await api.get<DashboardStatsDto>(
+      `/dashboard/stats?range=${range}&tz=${encodeURIComponent(tz)}`,
+    );
   } catch {
     /* stats stays null */
   } finally {

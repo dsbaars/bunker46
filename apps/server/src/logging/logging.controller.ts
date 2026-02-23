@@ -34,9 +34,13 @@ export class LoggingController {
   }
 
   @Get('dashboard/stats')
-  async getDashboardStats(@Req() req: AuthReq, @Query('range') range?: string) {
+  async getDashboardStats(
+    @Req() req: AuthReq,
+    @Query('range') range?: string,
+    @Query('tz') tz?: string,
+  ) {
     const validRange = (['1h', '24h', '7d'] as const).find((r) => r === range) ?? '7d';
-    return this.statsService.getDashboardStats(req.user.sub, validRange);
+    return this.statsService.getDashboardStats(req.user.sub, validRange, tz);
   }
 
   @Get('dashboard/activity')

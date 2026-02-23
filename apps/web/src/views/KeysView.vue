@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useStore } from '@nanostores/vue';
 import { Key, Star, Trash2, Pencil, RefreshCw } from 'lucide-vue-next';
 import { api } from '@/lib/api';
-import { useUiStore } from '@/stores/ui';
+import { useUiStore, $ui } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';
 import { deriveNip06Key, generateMnemonic } from '@/lib/nip06';
 import Button from '@/components/ui/Button.vue';
@@ -62,6 +63,7 @@ const deleteErrorOpen = ref(false);
 const deleting = ref(false);
 
 const ui = useUiStore();
+const uiState = useStore($ui);
 const { formatDate } = useFormatting();
 
 onMounted(async () => {
@@ -350,7 +352,7 @@ function setDefault(id: string) {
       <Card
         v-for="key in keys"
         :key="key.id"
-        :class="ui.defaultKeyId === key.id ? 'border-primary/50' : ''"
+        :class="uiState.defaultKeyId === key.id ? 'border-primary/50' : ''"
       >
         <div class="flex items-center justify-between gap-4">
           <div class="flex-1 min-w-0">
@@ -369,7 +371,7 @@ function setDefault(id: string) {
               <h3 class="font-semibold">
                 {{ key.label }}
               </h3>
-              <Badge v-if="ui.defaultKeyId === key.id" variant="default"> Default </Badge>
+              <Badge v-if="uiState.defaultKeyId === key.id" variant="default"> Default </Badge>
             </div>
             <p v-if="renamingKeyId === key.id && renameError" class="text-xs text-destructive mb-1">
               {{ renameError }}
@@ -381,16 +383,16 @@ function setDefault(id: string) {
           </div>
           <div class="flex items-center gap-2 shrink-0">
             <button
-              :title="ui.defaultKeyId === key.id ? 'Unset as default' : 'Set as default'"
+              :title="uiState.defaultKeyId === key.id ? 'Unset as default' : 'Set as default'"
               class="p-1 rounded transition-colors cursor-pointer"
               :class="
-                ui.defaultKeyId === key.id
+                uiState.defaultKeyId === key.id
                   ? 'text-yellow-500'
                   : 'text-muted-foreground hover:text-yellow-500'
               "
               @click="setDefault(key.id)"
             >
-              <Star :class="['w-5 h-5', ui.defaultKeyId === key.id ? 'fill-current' : '']" />
+              <Star :class="['w-5 h-5', uiState.defaultKeyId === key.id ? 'fill-current' : '']" />
             </button>
             <Button
               v-if="renamingKeyId !== key.id"
