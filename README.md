@@ -1,5 +1,9 @@
 # Bunker46
 
+<p align="center">
+  <img src="apps/web/public/logo.webp" alt="Bunker46" width="80" />
+</p>
+
 [![CI](https://github.com/dsbaars/bunker46/actions/workflows/ci.yml/badge.svg)](https://github.com/dsbaars/bunker46/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-brightgreen)](https://vuejs.org/)

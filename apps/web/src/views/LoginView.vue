@@ -152,7 +152,7 @@ async function handlePasskeyLogin() {
     </div>
     <div class="text-center mb-8">
       <img
-        src="/logo.png"
+        src="/logo.webp"
         alt="Bunker46"
         class="w-16 h-16 rounded-2xl object-contain mx-auto mb-4"
       />
