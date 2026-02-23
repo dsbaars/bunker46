@@ -40,29 +40,56 @@ describe('AuthController', () => {
   describe('getAuthConfig', () => {
     it('returns registrationEnabled: true when ALLOW_REGISTRATION is unset', () => {
       delete process.env['ALLOW_REGISTRATION'];
-      expect(controller.getAuthConfig()).toEqual({ registrationEnabled: true });
+      expect(controller.getAuthConfig()).toEqual({
+        registrationEnabled: true,
+        loginNotice: null,
+      });
     });
 
     it('returns registrationEnabled: true when ALLOW_REGISTRATION is "true"', () => {
       process.env['ALLOW_REGISTRATION'] = 'true';
-      expect(controller.getAuthConfig()).toEqual({ registrationEnabled: true });
+      expect(controller.getAuthConfig()).toEqual({
+        registrationEnabled: true,
+        loginNotice: null,
+      });
     });
 
     it('returns registrationEnabled: true for any value other than false/0', () => {
       process.env['ALLOW_REGISTRATION'] = '1';
-      expect(controller.getAuthConfig()).toEqual({ registrationEnabled: true });
+      expect(controller.getAuthConfig()).toEqual({
+        registrationEnabled: true,
+        loginNotice: null,
+      });
       process.env['ALLOW_REGISTRATION'] = 'yes';
-      expect(controller.getAuthConfig()).toEqual({ registrationEnabled: true });
+      expect(controller.getAuthConfig()).toEqual({
+        registrationEnabled: true,
+        loginNotice: null,
+      });
     });
 
     it('returns registrationEnabled: false when ALLOW_REGISTRATION is "false"', () => {
       process.env['ALLOW_REGISTRATION'] = 'false';
-      expect(controller.getAuthConfig()).toEqual({ registrationEnabled: false });
+      expect(controller.getAuthConfig()).toEqual({
+        registrationEnabled: false,
+        loginNotice: null,
+      });
     });
 
     it('returns registrationEnabled: false when ALLOW_REGISTRATION is "0"', () => {
       process.env['ALLOW_REGISTRATION'] = '0';
-      expect(controller.getAuthConfig()).toEqual({ registrationEnabled: false });
+      expect(controller.getAuthConfig()).toEqual({
+        registrationEnabled: false,
+        loginNotice: null,
+      });
+    });
+
+    it('returns loginNotice when LOGIN_NOTICE is set', () => {
+      process.env['LOGIN_NOTICE'] = ' Testing server. Data may be deleted. ';
+      expect(controller.getAuthConfig()).toEqual({
+        registrationEnabled: true,
+        loginNotice: 'Testing server. Data may be deleted.',
+      });
+      delete process.env['LOGIN_NOTICE'];
     });
   });
 
