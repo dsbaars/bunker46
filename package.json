@@ -26,6 +26,7 @@
     "e2e:ui": "pnpm --filter @bunker46/web run e2e:ui",
     "e2e:screenshots": "pnpm --filter @bunker46/web run e2e:screenshots",
     "db:migrate": "pnpm --filter @bunker46/server run db:migrate",
+    "db:baseline-legacy": "pnpm --filter @bunker46/server run db:baseline-legacy",
     "db:generate": "pnpm --filter @bunker46/server run db:generate",
     "db:push": "pnpm --filter @bunker46/server run db:push",
     "clean": "pnpm -r run clean && rm -rf node_modules",

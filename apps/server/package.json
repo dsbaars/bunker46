@@ -14,6 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:baseline-legacy": "prisma db execute --file prisma/baseline-from-legacy.sql && prisma migrate resolve --applied 20260330100000_initial_schema",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "clean": "rm -rf dist",
