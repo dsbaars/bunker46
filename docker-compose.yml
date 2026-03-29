@@ -48,6 +48,8 @@ services:
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      # Comma-separated wss:// relay URLs when none are stored in DB; omit for built-in defaults
+      NOSTR_DEFAULT_RELAYS: ${NOSTR_DEFAULT_RELAYS:-}
     depends_on:
       db:
         condition: service_healthy

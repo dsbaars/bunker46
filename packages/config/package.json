@@ -16,6 +16,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@bunker46/shared-types": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {

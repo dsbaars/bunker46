@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { NOSTR_CONSTANTS } from '@bunker46/config';
 import { BunkerService } from './bunker.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { BunkerRpcHandler } from './bunker-rpc.handler.js';
@@ -36,6 +37,7 @@ describe('BunkerService', () => {
       rpcHandler as BunkerRpcHandler,
       prisma as PrismaService,
       encryption as EncryptionService,
+      [...NOSTR_CONSTANTS.DEFAULT_RELAYS],
     );
     await service.onModuleInit();
   });
@@ -94,6 +96,7 @@ describe('BunkerService', () => {
         rpcHandler as BunkerRpcHandler,
         prisma as PrismaService,
         encryption as EncryptionService,
+        [...NOSTR_CONSTANTS.DEFAULT_RELAYS],
       );
       await service.onModuleInit();
       const pubkey = 'd'.repeat(64);

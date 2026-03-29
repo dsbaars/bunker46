@@ -1,4 +1,10 @@
-import { Injectable, Logger, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleInit,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { SimplePool } from 'nostr-tools/pool';
 import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 import { hexToBytes } from '@noble/hashes/utils.js';
@@ -6,7 +12,7 @@ import * as nip44 from 'nostr-tools/nip44';
 import * as nip04 from 'nostr-tools/nip04';
 import { BunkerRpcHandler } from './bunker-rpc.handler.js';
 import { Nip46RequestSchema, SafeRelayUrlSchema } from '@bunker46/shared-types';
-import { NOSTR_CONSTANTS } from '@bunker46/config';
+import { NOSTR_CONSTANTS, NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN } from '@bunker46/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { useWebSocketImplementation } from 'nostr-tools/pool';
@@ -36,6 +42,8 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
     private readonly rpcHandler: BunkerRpcHandler,
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
+    @Inject(NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN)
+    private readonly defaultRelays: string[],
   ) {
     this.pool = new SimplePool({ enablePing: true, enableReconnect: true });
   }
@@ -56,7 +64,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
       this.logger.debug(`Stopped listener for ${pubkey.slice(0, 12)}...`);
     }
     this.activeListeners.clear();
-    this.pool.close([...NOSTR_CONSTANTS.DEFAULT_RELAYS]);
+    this.pool.close([...this.defaultRelays]);
   }
 
   registerPendingSecret(signerPubkey: string, secret: string, info: PendingSecretInfo) {
@@ -89,9 +97,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
 
     const configuredRelays = await this.prisma.relayConfig.findMany({ select: { url: true } });
     const baseRelays =
-      configuredRelays.length > 0
-        ? configuredRelays.map((r) => r.url)
-        : [...NOSTR_CONSTANTS.DEFAULT_RELAYS];
+      configuredRelays.length > 0 ? configuredRelays.map((r) => r.url) : [...this.defaultRelays];
 
     for (const key of nsecKeys) {
       const nsecHex = this.encryption.decrypt(key.encryptedNsec);
@@ -109,7 +115,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   startListeningForKey(signerPubkeyHex: string, signerNsecHex: string, relays: string[]): void {
-    const rawRelays = relays.length > 0 ? relays : [...NOSTR_CONSTANTS.DEFAULT_RELAYS];
+    const rawRelays = relays.length > 0 ? relays : [...this.defaultRelays];
     const effectiveRelays = rawRelays.filter((url) => {
       const result = SafeRelayUrlSchema.safeParse(url);
       if (!result.success) {
@@ -120,7 +126,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
     });
     if (effectiveRelays.length === 0) {
       this.logger.warn('No safe relay URLs left after filtering; using defaults');
-      effectiveRelays.push(...NOSTR_CONSTANTS.DEFAULT_RELAYS);
+      effectiveRelays.push(...this.defaultRelays);
     }
 
     const existing = this.activeListeners.get(signerPubkeyHex);
@@ -167,9 +173,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
 
     const configuredRelays = await this.prisma.relayConfig.findMany({ select: { url: true } });
     const baseRelays =
-      configuredRelays.length > 0
-        ? configuredRelays.map((r) => r.url)
-        : [...NOSTR_CONSTANTS.DEFAULT_RELAYS];
+      configuredRelays.length > 0 ? configuredRelays.map((r) => r.url) : [...this.defaultRelays];
 
     const relays = [...new Set([...connectionRelays, ...baseRelays])];
     this.startListeningForKey(key.publicKey, nsecHex, relays);
@@ -295,9 +299,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
 
     const configuredRelays = await this.prisma.relayConfig.findMany({ select: { url: true } });
     const baseRelays =
-      configuredRelays.length > 0
-        ? configuredRelays.map((r) => r.url)
-        : [...NOSTR_CONSTANTS.DEFAULT_RELAYS];
+      configuredRelays.length > 0 ? configuredRelays.map((r) => r.url) : [...this.defaultRelays];
     const effectiveRelays = [...new Set([...relays, ...baseRelays])];
 
     const responsePayload = JSON.stringify({

@@ -1,4 +1,13 @@
-import { BadRequestException, Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  Req,
+  Inject,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SafeRelayUrlsSchema } from '@bunker46/shared-types';
 import { AdminGuard } from '../auth/guards/admin.guard.js';
@@ -8,7 +17,7 @@ import { BunkerService } from './bunker.service.js';
 import { BunkerUriService } from './bunker-uri.service.js';
 import { ConnectionsService } from '../connections/connections.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { NOSTR_CONSTANTS } from '@bunker46/config';
+import { NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN } from '@bunker46/config';
 import type { FastifyRequest } from 'fastify';
 import { randomBytes } from 'node:crypto';
 
@@ -24,6 +33,8 @@ export class BunkerController {
     private readonly uriService: BunkerUriService,
     private readonly connectionsService: ConnectionsService,
     private readonly prisma: PrismaService,
+    @Inject(NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN)
+    private readonly defaultRelays: string[],
   ) {}
 
   @Post('parse-uri')
@@ -62,7 +73,7 @@ export class BunkerController {
   @Get('relays')
   async getRelays() {
     const relays = await this.prisma.relayConfig.findMany({ orderBy: { createdAt: 'asc' } });
-    return { relays, defaults: [...NOSTR_CONSTANTS.DEFAULT_RELAYS] };
+    return { relays, defaults: [...this.defaultRelays] };
   }
 
   @Post('relays')
@@ -95,6 +106,6 @@ export class BunkerController {
   private async getActiveRelays(): Promise<string[]> {
     const configured = await this.prisma.relayConfig.findMany({ select: { url: true } });
     if (configured.length > 0) return configured.map((r) => r.url);
-    return [...NOSTR_CONSTANTS.DEFAULT_RELAYS];
+    return [...this.defaultRelays];
   }
 }

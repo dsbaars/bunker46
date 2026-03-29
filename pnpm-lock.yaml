@@ -288,6 +288,9 @@ importers:
 
   packages/config:
     dependencies:
+      '@bunker46/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
       zod:
         specifier: ^4.0.0
         version: 4.3.6

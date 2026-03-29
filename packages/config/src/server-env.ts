@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { SafeRelayUrlsSchema } from '@bunker46/shared-types';
+import { NOSTR_CONSTANTS } from './constants.js';
 
 export const serverEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
@@ -46,6 +48,43 @@ export const serverEnvSchema = z.object({
    * server and data may be deleted. Leave unset or empty to show no notice.
    */
   LOGIN_NOTICE: z.string().optional().default(''),
+
+  /**
+   * Override built-in default Nostr relays (wss:// only, comma-separated).
+   * Used when no relays are stored in the database and as fallback in the bunker service.
+   */
+  NOSTR_DEFAULT_RELAYS: z
+    .string()
+    .optional()
+    .default('')
+    .superRefine((raw, ctx) => {
+      const urls = raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (urls.length === 0) return;
+      const parsed = SafeRelayUrlsSchema.safeParse(urls);
+      if (!parsed.success) {
+        for (const issue of parsed.error.issues) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: issue.message,
+            path: ['NOSTR_DEFAULT_RELAYS', ...(issue.path as (string | number)[])],
+          });
+        }
+      }
+    })
+    .transform((raw) => {
+      const urls = raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (urls.length === 0) return [...NOSTR_CONSTANTS.DEFAULT_RELAYS];
+      return SafeRelayUrlsSchema.parse(urls);
+    }),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
+
+/** Nest DI token for {@link ServerEnv.NOSTR_DEFAULT_RELAYS} (effective default relay URLs). */
+export const NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN = 'NOSTR_DEFAULT_RELAYS' as const;

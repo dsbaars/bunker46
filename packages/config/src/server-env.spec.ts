@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NOSTR_CONSTANTS } from './constants.js';
 import { serverEnvSchema } from './server-env.js';
 
 describe('serverEnvSchema', () => {
@@ -59,6 +60,57 @@ describe('serverEnvSchema', () => {
       if (result.success) {
         expect(result.data.ALLOW_REGISTRATION).toBe(true);
       }
+    });
+  });
+
+  describe('NOSTR_DEFAULT_RELAYS', () => {
+    it('defaults to built-in relays when omitted', () => {
+      const result = serverEnvSchema.safeParse(baseEnv);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.NOSTR_DEFAULT_RELAYS).toEqual([...NOSTR_CONSTANTS.DEFAULT_RELAYS]);
+      }
+    });
+
+    it('defaults to built-in when empty string', () => {
+      const result = serverEnvSchema.safeParse({
+        ...baseEnv,
+        NOSTR_DEFAULT_RELAYS: '  ,  ',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.NOSTR_DEFAULT_RELAYS).toEqual([...NOSTR_CONSTANTS.DEFAULT_RELAYS]);
+      }
+    });
+
+    it('parses comma-separated wss URLs', () => {
+      const result = serverEnvSchema.safeParse({
+        ...baseEnv,
+        NOSTR_DEFAULT_RELAYS: 'wss://relay1.example.com, wss://relay2.example.com',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.NOSTR_DEFAULT_RELAYS).toEqual([
+          'wss://relay1.example.com',
+          'wss://relay2.example.com',
+        ]);
+      }
+    });
+
+    it('rejects invalid relay URLs', () => {
+      const result = serverEnvSchema.safeParse({
+        ...baseEnv,
+        NOSTR_DEFAULT_RELAYS: 'not-a-url',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects ws:// (only wss allowed)', () => {
+      const result = serverEnvSchema.safeParse({
+        ...baseEnv,
+        NOSTR_DEFAULT_RELAYS: 'ws://relay.example.com',
+      });
+      expect(result.success).toBe(false);
     });
   });
 });
