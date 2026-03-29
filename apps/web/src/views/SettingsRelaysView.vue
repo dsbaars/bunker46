@@ -84,8 +84,9 @@ async function saveRelays() {
       <Card>
         <h2 class="text-lg font-semibold mb-2">Active Relays</h2>
         <p class="text-sm text-muted-foreground mb-4">
-          These relays are used when generating <code class="text-primary">bunker://</code> URIs and
-          listening for NIP-46 signing requests. Changes take effect after saving.
+          These relays apply to your account when generating
+          <code class="text-primary">bunker://</code>
+          URIs and listening for NIP-46 signing requests. Changes take effect after saving.
         </p>
 
         <div

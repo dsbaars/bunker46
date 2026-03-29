@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SafeRelayUrlsSchema } from '@bunker46/shared-types';
-import { AdminGuard } from '../auth/guards/admin.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { TotpVerifiedGuard } from '../auth/guards/totp-verified.guard.js';
 import { BunkerService } from './bunker.service.js';
@@ -55,7 +54,7 @@ export class BunkerController {
       throw new Error('Key not found');
     }
 
-    const relays = await this.getActiveRelays();
+    const relays = await this.getActiveRelaysForUser(req.user.sub);
     const secret = randomBytes(16).toString('hex');
 
     this.bunkerService.registerPendingSecret(key.publicKey, secret, {
@@ -71,13 +70,15 @@ export class BunkerController {
   }
 
   @Get('relays')
-  async getRelays() {
-    const relays = await this.prisma.relayConfig.findMany({ orderBy: { createdAt: 'asc' } });
+  async getRelays(@Req() req: AuthReq) {
+    const relays = await this.prisma.relayConfig.findMany({
+      where: { userId: req.user.sub },
+      orderBy: { createdAt: 'asc' },
+    });
     return { relays, defaults: [...this.defaultRelays] };
   }
 
   @Post('relays')
-  @UseGuards(AdminGuard)
   async setRelays(@Req() req: AuthReq, @Body() body: { relays: string[] }) {
     const parsed = SafeRelayUrlsSchema.safeParse(body.relays ?? []);
     if (!parsed.success) {
@@ -85,11 +86,11 @@ export class BunkerController {
         parsed.error.flatten().formErrors.join(' ') || 'Invalid relay URLs',
       );
     }
-    const relays = parsed.data;
-    await this.prisma.relayConfig.deleteMany({});
+    const relays = [...new Set(parsed.data)];
+    await this.prisma.relayConfig.deleteMany({ where: { userId: req.user.sub } });
     if (relays.length > 0) {
       await this.prisma.relayConfig.createMany({
-        data: relays.map((url) => ({ url })),
+        data: relays.map((url) => ({ url, userId: req.user.sub })),
       });
     }
     return { relays };
@@ -103,8 +104,12 @@ export class BunkerController {
     };
   }
 
-  private async getActiveRelays(): Promise<string[]> {
-    const configured = await this.prisma.relayConfig.findMany({ select: { url: true } });
+  private async getActiveRelaysForUser(userId: string): Promise<string[]> {
+    const configured = await this.prisma.relayConfig.findMany({
+      where: { userId },
+      select: { url: true },
+      orderBy: { createdAt: 'asc' },
+    });
     if (configured.length > 0) return configured.map((r) => r.url);
     return [...this.defaultRelays];
   }

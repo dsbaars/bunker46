@@ -85,6 +85,15 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
     return this.pendingSecrets.size;
   }
 
+  private async getBaseRelayUrlsForUser(userId: string): Promise<string[]> {
+    const configured = await this.prisma.relayConfig.findMany({
+      where: { userId },
+      select: { url: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return configured.length > 0 ? configured.map((r) => r.url) : [...this.defaultRelays];
+  }
+
   private async resumeAllListeners() {
     const nsecKeys = await this.prisma.nsecKey.findMany({
       include: {
@@ -95,12 +104,21 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    const configuredRelays = await this.prisma.relayConfig.findMany({ select: { url: true } });
-    const baseRelays =
-      configuredRelays.length > 0 ? configuredRelays.map((r) => r.url) : [...this.defaultRelays];
+    const allConfigs = await this.prisma.relayConfig.findMany({
+      select: { userId: true, url: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const relaysByUser = new Map<string, string[]>();
+    for (const row of allConfigs) {
+      const list = relaysByUser.get(row.userId);
+      if (list) list.push(row.url);
+      else relaysByUser.set(row.userId, [row.url]);
+    }
 
     for (const key of nsecKeys) {
       const nsecHex = this.encryption.decrypt(key.encryptedNsec);
+      const userRelays = relaysByUser.get(key.userId);
+      const baseRelays = userRelays && userRelays.length > 0 ? userRelays : [...this.defaultRelays];
       const allRelays = new Set<string>(baseRelays);
       for (const conn of key.connections) {
         for (const r of conn.relays) allRelays.add(r);
@@ -110,7 +128,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.log(
-      `Resumed listeners for ${nsecKeys.length} nsec key(s) on ${baseRelays.join(', ')}`,
+      `Resumed listeners for ${nsecKeys.length} nsec key(s) (per-user relay defaults)`,
     );
   }
 
@@ -171,9 +189,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
 
     const nsecHex = this.encryption.decrypt(key.encryptedNsec);
 
-    const configuredRelays = await this.prisma.relayConfig.findMany({ select: { url: true } });
-    const baseRelays =
-      configuredRelays.length > 0 ? configuredRelays.map((r) => r.url) : [...this.defaultRelays];
+    const baseRelays = await this.getBaseRelayUrlsForUser(key.userId);
 
     const relays = [...new Set([...connectionRelays, ...baseRelays])];
     this.startListeningForKey(key.publicKey, nsecHex, relays);
@@ -297,9 +313,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
     const nsecHex = this.encryption.decrypt(key.encryptedNsec);
     const signerSecretKey = hexToBytes(nsecHex);
 
-    const configuredRelays = await this.prisma.relayConfig.findMany({ select: { url: true } });
-    const baseRelays =
-      configuredRelays.length > 0 ? configuredRelays.map((r) => r.url) : [...this.defaultRelays];
+    const baseRelays = await this.getBaseRelayUrlsForUser(key.userId);
     const effectiveRelays = [...new Set([...relays, ...baseRelays])];
 
     const responsePayload = JSON.stringify({

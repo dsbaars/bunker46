@@ -1,6 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { serverEnvSchema, NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN } from '@bunker46/config';
-import { AdminGuard } from '../auth/guards/admin.guard.js';
 import { BunkerService } from './bunker.service.js';
 import { BunkerGateway } from './bunker.gateway.js';
 import { BunkerUriService } from './bunker-uri.service.js';
@@ -18,7 +17,6 @@ import { BunkerController } from './bunker.controller.js';
       provide: NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN,
       useFactory: () => serverEnvSchema.parse(process.env).NOSTR_DEFAULT_RELAYS,
     },
-    AdminGuard,
     BunkerService,
     BunkerGateway,
     BunkerUriService,

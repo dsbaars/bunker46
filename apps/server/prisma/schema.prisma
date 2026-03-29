@@ -19,10 +19,11 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  sessions    Session[]
-  passkeys    Passkey[]
-  nsecKeys    NsecKey[]
-  connections BunkerConnection[]
+  sessions     Session[]
+  passkeys     Passkey[]
+  nsecKeys     NsecKey[]
+  connections  BunkerConnection[]
+  relayConfigs RelayConfig[]
 
   @@map("users")
 }
@@ -154,11 +155,16 @@ enum LogResult {
 }
 
 model RelayConfig {
-  id        String   @id @default(cuid())
-  url       String   @unique
-  isHealthy Boolean  @default(true) @map("is_healthy")
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  url       String
+  isHealthy Boolean   @default(true) @map("is_healthy")
   lastCheck DateTime? @map("last_check")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, url])
+  @@index([userId])
   @@map("relay_configs")
 }
