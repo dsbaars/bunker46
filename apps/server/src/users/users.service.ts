@@ -24,6 +24,10 @@ export class UsersService {
     });
   }
 
+  async count(): Promise<number> {
+    return this.prisma.user.count();
+  }
+
   async findByUsername(username: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { username } });
   }

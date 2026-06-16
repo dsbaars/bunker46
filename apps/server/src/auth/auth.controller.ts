@@ -53,10 +53,13 @@ export class AuthController {
   ) {}
 
   @Get('config')
-  getAuthConfig() {
+  async getAuthConfig() {
     const loginNotice = process.env['LOGIN_NOTICE']?.trim() || null;
+    // The first account can always be created, so keep advertising the sign-up
+    // form until a user exists even when public registration is disabled.
+    const noUsersYet = (await this.usersService.count()) === 0;
     return {
-      registrationEnabled: isRegistrationAllowed(),
+      registrationEnabled: isRegistrationAllowed() || noUsersYet,
       loginNotice,
     };
   }
@@ -64,7 +67,10 @@ export class AuthController {
   @Post('register')
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   async register(@Req() req: FastifyRequest, @Body() body: unknown) {
-    if (!isRegistrationAllowed()) {
+    // Always allow the very first account to be created so an operator can
+    // bootstrap the instance without opening public registration.
+    const noUsersYet = (await this.usersService.count()) === 0;
+    if (!isRegistrationAllowed() && !noUsersYet) {
       throw new ForbiddenException('Registration is disabled');
     }
     const parsed = RegisterRequestSchema.safeParse(body);
