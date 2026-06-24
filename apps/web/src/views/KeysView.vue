@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useStore } from '@nanostores/vue';
-import { Key, Star, Trash2, Pencil, RefreshCw } from 'lucide-vue-next';
+import { Key, Star, Trash2, Pencil, RefreshCw } from '@lucide/vue';
 import { api } from '@/lib/api';
 import { useUiStore, $ui } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';

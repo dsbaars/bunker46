@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue';
-import { QrCode } from 'lucide-vue-next';
+import { QrCode } from '@lucide/vue';
 import { hexToNpub } from '@/lib/pubkey';
 
 const props = withDefaults(

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { HelpCircle } from 'lucide-vue-next';
+import { HelpCircle } from '@lucide/vue';
 import Card from './Card.vue';
 import TooltipRoot from './tooltip/TooltipRoot.vue';
 import TooltipTrigger from './tooltip/TooltipTrigger.vue';

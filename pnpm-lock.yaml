@@ -173,6 +173,9 @@ importers:
       '@bunker46/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
+      '@lucide/vue':
+        specifier: ^1.21.0
+        version: 1.21.0(vue@3.5.38(typescript@6.0.3))
       '@nanostores/vue':
         specifier: ^1.1.0
         version: 1.1.0(@vue/devtools-api@8.1.3)(nanostores@1.3.0)(vue@3.5.38(typescript@6.0.3))
@@ -203,9 +206,6 @@ importers:
       localforage:
         specifier: ^1.10.0
         version: 1.10.0
-      lucide-vue-next:
-        specifier: ^1.0.0
-        version: 1.0.0(vue@3.5.38(typescript@6.0.3))
       nanostores:
         specifier: ^1.3.0
         version: 1.3.0
@@ -1602,6 +1602,14 @@ packages:
       {
         integrity: sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow==,
       }
+
+  '@lucide/vue@1.21.0':
+    resolution:
+      {
+        integrity: sha512-eoFn3tppjKAc12ZqdnRSMFdtwQ1ZMRQFb6SV1Eub6Y8kU28ccnqKeSFdnur9hMg8gIbosU2Y3WFJr/J/xS/IlQ==,
+      }
+    peerDependencies:
+      vue: '>=3.0.1'
 
   '@lukeed/csprng@1.1.0':
     resolution:
@@ -6083,15 +6091,6 @@ packages:
       }
     engines: { bun: '>=1.0.0', deno: '>=1.30.0', node: '>=8.0.0' }
 
-  lucide-vue-next@1.0.0:
-    resolution:
-      {
-        integrity: sha512-V6SPvx1IHTj/UY+FrIYWV5faISsPSb8BnWSFDxAtezWKvWc9ZZ40PDrdu1/Qb5vg4lHWr1hs1BAMGVGm6V1Xdg==,
-      }
-    deprecated: Package deprecated. Please use @lucide/vue instead.
-    peerDependencies:
-      vue: '>=3.0.1'
-
   magic-string-ast@1.0.3:
     resolution:
       {
@@ -9140,6 +9139,10 @@ snapshots:
 
   '@levischuck/tiny-cbor@0.2.11': {}
 
+  '@lucide/vue@1.21.0(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      vue: 3.5.38(typescript@6.0.3)
+
   '@lukeed/csprng@1.1.0': {}
 
   '@lukeed/ms@2.0.2': {}
@@ -11891,10 +11894,6 @@ snapshots:
   lru-cache@11.5.1: {}
 
   lru.min@1.1.4: {}
-
-  lucide-vue-next@1.0.0(vue@3.5.38(typescript@6.0.3)):
-    dependencies:
-      vue: 3.5.38(typescript@6.0.3)
 
   magic-string-ast@1.0.3:
     dependencies:

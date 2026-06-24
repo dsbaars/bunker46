@@ -11,7 +11,7 @@ import {
   SlidersHorizontal,
   PanelLeft,
   Menu,
-} from 'lucide-vue-next';
+} from '@lucide/vue';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore, $ui } from '@/stores/ui';
 import { useSettingsStore } from '@/stores/settings';

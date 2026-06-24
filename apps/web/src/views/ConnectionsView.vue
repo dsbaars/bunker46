@@ -2,7 +2,7 @@
 import { ref, watch, onMounted, computed } from 'vue';
 import { useActivityStream } from '@/composables/useActivityStream';
 import { useRouter, useRoute } from 'vue-router';
-import { Link2, KeyRound, Plug, Lock, Unlock, Search } from 'lucide-vue-next';
+import { Link2, KeyRound, Plug, Lock, Unlock, Search } from '@lucide/vue';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';

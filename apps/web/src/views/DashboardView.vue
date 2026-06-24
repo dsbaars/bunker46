@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Activity, Link2, PenLine, BarChart3, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { Activity, Link2, PenLine, BarChart3, ChevronLeft, ChevronRight } from '@lucide/vue';
 import { api } from '@/lib/api';
 import { useFormatting } from '@/composables/useFormatting';
 import { useActivityStream } from '@/composables/useActivityStream';
