@@ -51,6 +51,27 @@ describe('EncryptionService', () => {
     expect(service.decrypt(legacy)).toBe('nsec1legacysecret');
   });
 
+  it('still decrypts legacy ciphertext when ENCRYPTION_KEY is a raw hex key', () => {
+    // legacyKey is sha256(rawKey) regardless of key format, so raw-key deployments must also be
+    // able to read pre-v2 data written before the upgrade.
+    vi.stubEnv('ENCRYPTION_KEY', HEX_KEY);
+    const legacy = legacyEncrypt(HEX_KEY, 'nsec1legacy-hex');
+    const s = new EncryptionService();
+    expect(s.decrypt(legacy)).toBe('nsec1legacy-hex');
+  });
+
+  it('rejects legacy ciphertext decrypted with the wrong key (GCM auth fails)', () => {
+    const legacy = legacyEncrypt('a-totally-different-key-32-characters!!', 'secret');
+    expect(() => service.decrypt(legacy)).toThrow();
+  });
+
+  it('rejects a tampered legacy auth tag', () => {
+    const legacy = legacyEncrypt(PASSPHRASE_KEY, 'secret');
+    const buf = Buffer.from(legacy, 'base64');
+    buf[13] ^= 0xff; // flip a bit inside the 16-byte GCM tag (offset 12..27)
+    expect(() => service.decrypt(buf.toString('base64'))).toThrow();
+  });
+
   it('throws when ENCRYPTION_KEY is too short', () => {
     vi.stubEnv('ENCRYPTION_KEY', 'short');
     expect(() => new EncryptionService()).toThrow(/at least 32 characters/);

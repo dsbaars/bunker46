@@ -22,6 +22,11 @@ const SCRYPT_SALT = Buffer.from('bunker46:encryption-key:v2');
  * base64url that decodes to exactly 32 bytes (e.g. `openssl rand -base64 32`). Returns null for
  * anything else, which is then treated as a passphrase. Round-trip checks reject lenient/partial
  * base64 so a normal passphrase is never mistaken for a raw key.
+ *
+ * Footgun, knowingly accepted: a passphrase that happens to be exactly 64 hex chars or canonical
+ * 32-byte base64 (e.g. all "A"s) is taken as a raw key and used directly. Such values are extremely
+ * unlikely for a human-chosen passphrase, are rejected as low-entropy by the production env check
+ * (serverEnvSchema), and only affect NEW (v2) writes — legacy data still decrypts via legacyKey.
  */
 function decodeRaw32(value: string): Buffer | null {
   if (/^[0-9a-fA-F]{64}$/.test(value)) return Buffer.from(value, 'hex');
