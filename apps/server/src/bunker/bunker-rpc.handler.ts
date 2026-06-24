@@ -56,7 +56,7 @@ export class BunkerRpcHandler {
     getPublicKeyFromNsec: (nsecHex: string) => string,
   ): Promise<Nip46Response> {
     const start = Date.now();
-    let connection = await this.connections.findByClientPubkey(clientPubkey);
+    let connection = await this.connections.findByClientAndSigner(clientPubkey, signerPubkey);
 
     if (!connection && request.method === 'connect') {
       connection = await this.handleNewConnect(clientPubkey, signerPubkey, request);
@@ -274,7 +274,7 @@ export class BunkerRpcHandler {
         secret,
       });
 
-      return this.connections.findByClientPubkey(clientPubkey);
+      return this.connections.findByClientAndSigner(clientPubkey, signerPubkey);
     } catch (err) {
       this.logger.error(`Failed to auto-create connection: ${err}`);
       return null;

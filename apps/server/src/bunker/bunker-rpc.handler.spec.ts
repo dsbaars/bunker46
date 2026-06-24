@@ -62,7 +62,7 @@ describe('BunkerRpcHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     connections = {
-      findByClientPubkey: vi.fn().mockResolvedValue(null),
+      findByClientAndSigner: vi.fn().mockResolvedValue(null),
       updateConnectionStatus: vi.fn().mockResolvedValue(undefined as never),
       setPermissions: vi.fn().mockResolvedValue(undefined as never),
       touchActivity: vi.fn().mockResolvedValue(undefined as never),
@@ -80,7 +80,7 @@ describe('BunkerRpcHandler', () => {
 
   describe('unknown / revoked connections', () => {
     it('rejects a non-connect request from an unknown client', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(null as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(null as never);
       const res = await handle(request('sign_event', [signEventJson(1)]));
       expect(res).toEqual({ id: 'req-1', error: 'Unknown client' });
       expect(signEvent).not.toHaveBeenCalled();
@@ -89,7 +89,7 @@ describe('BunkerRpcHandler', () => {
     });
 
     it('rejects requests on a REVOKED connection', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([{ method: 'sign_event' }], 'REVOKED') as never,
       );
       const res = await handle(request('sign_event', [signEventJson(1)]));
@@ -98,9 +98,21 @@ describe('BunkerRpcHandler', () => {
     });
   });
 
+  describe('signer binding (M1)', () => {
+    it('resolves the connection scoped to the signer pubkey the request was addressed to', async () => {
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
+        makeConnection([{ method: 'sign_event', kind: 1 }]) as never,
+      );
+      await handle(request('sign_event', [signEventJson(1)]));
+      // The relay #p tag / listener key is passed through so a request for signer A cannot be served
+      // by a connection bound to signer B.
+      expect(connections.findByClientAndSigner).toHaveBeenCalledWith(CLIENT, SIGNER);
+    });
+  });
+
   describe('default-deny permission model', () => {
     it('denies sign_event when the connection has NO permissions (not fail-open)', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(makeConnection([]) as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(makeConnection([]) as never);
       const res = await handle(request('sign_event', [signEventJson(1)]));
       expect(res.error).toBe('Permission denied for sign_event kind:1');
       expect(res.result).toBeUndefined();
@@ -108,14 +120,14 @@ describe('BunkerRpcHandler', () => {
     });
 
     it('denies nip44_decrypt with no permissions (no blanket decryption oracle)', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(makeConnection([]) as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(makeConnection([]) as never);
       const res = await handle(request('nip44_decrypt', ['third-party-pubkey', 'ciphertext']));
       expect(res.error).toBe('Permission denied for nip44_decrypt');
       expect(nip44Decrypt).not.toHaveBeenCalled();
     });
 
     it('denies nip04_decrypt with no permissions', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(makeConnection([]) as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(makeConnection([]) as never);
       const res = await handle(request('nip04_decrypt', ['third-party-pubkey', 'ciphertext']));
       expect(res.error).toBe('Permission denied for nip04_decrypt');
       expect(nip04Decrypt).not.toHaveBeenCalled();
@@ -124,7 +136,7 @@ describe('BunkerRpcHandler', () => {
 
   describe('permission enforcement', () => {
     it('allows sign_event for a kind explicitly permitted', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([{ method: 'sign_event', kind: 1 }]) as never,
       );
       const res = await handle(request('sign_event', [signEventJson(1)]));
@@ -134,7 +146,7 @@ describe('BunkerRpcHandler', () => {
     });
 
     it('denies sign_event for a kind that is not permitted', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([{ method: 'sign_event', kind: 1 }]) as never,
       );
       const res = await handle(request('sign_event', [signEventJson(2)]));
@@ -143,7 +155,7 @@ describe('BunkerRpcHandler', () => {
     });
 
     it('a method-level sign_event permission (no kind) allows any kind', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([{ method: 'sign_event' }]) as never,
       );
       const res = await handle(request('sign_event', [signEventJson(30023)]));
@@ -152,7 +164,7 @@ describe('BunkerRpcHandler', () => {
     });
 
     it('allows nip44_decrypt when explicitly permitted', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([{ method: 'nip44_decrypt' }]) as never,
       );
       const res = await handle(request('nip44_decrypt', ['third-party-pubkey', 'ciphertext']));
@@ -164,14 +176,14 @@ describe('BunkerRpcHandler', () => {
 
   describe('unguarded informational methods', () => {
     it('responds to ping without requiring a permission', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(makeConnection([]) as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(makeConnection([]) as never);
       const res = await handle(request('ping'));
       expect(res.result).toBe('pong');
       expect(res.error).toBeUndefined();
     });
 
     it('returns get_public_key without requiring a permission', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(makeConnection([]) as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(makeConnection([]) as never);
       const res = await handle(request('get_public_key'));
       expect(res.result).toBe('signer-pubkey-hex');
       expect(res.error).toBeUndefined();
@@ -180,7 +192,7 @@ describe('BunkerRpcHandler', () => {
 
   describe('connect handshake', () => {
     it('activates a PENDING connection and echoes its secret', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([], 'PENDING', 'the-secret') as never,
       );
       const res = await handle(request('connect', ['', '']));
@@ -189,7 +201,7 @@ describe('BunkerRpcHandler', () => {
     });
 
     it('stores explicit permissions sent in the connect request', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([], 'PENDING') as never,
       );
       await handle(request('connect', ['', '', 'sign_event:1,nip44_decrypt']));
@@ -202,7 +214,7 @@ describe('BunkerRpcHandler', () => {
 
   describe('audit logging', () => {
     it('logs an approved signing action and publishes activity', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([{ method: 'sign_event', kind: 1 }]) as never,
       );
       await handle(request('sign_event', [signEventJson(1)]));
@@ -220,7 +232,7 @@ describe('BunkerRpcHandler', () => {
     });
 
     it('logs a permission-denied signing action as a non-approved result', async () => {
-      vi.mocked(connections.findByClientPubkey!).mockResolvedValue(makeConnection([]) as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(makeConnection([]) as never);
       await handle(request('sign_event', [signEventJson(1)]));
       expect(loggingService.logSigningAction).toHaveBeenCalledWith(
         expect.objectContaining({ method: 'sign_event', result: 'ERROR' }),

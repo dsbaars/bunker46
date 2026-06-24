@@ -184,9 +184,20 @@ export class ConnectionsService {
     await this.prisma.nsecKey.delete({ where: { id: nsecKeyId } });
   }
 
-  async findByClientPubkey(clientPubkey: string) {
+  /**
+   * Resolve the connection for an incoming NIP-46 request by BOTH the client pubkey and the signer
+   * key the request was addressed to (the relay #p tag / listener key). Binding on the signer key
+   * (M1) prevents key-confusion: a client that holds connections to several of the user's keys
+   * cannot have a request addressed to key A served by a connection bound to key B — which could
+   * sign/decrypt with the wrong key under a different, possibly broader permission set.
+   */
+  async findByClientAndSigner(clientPubkey: string, signerPubkey: string) {
     return this.prisma.bunkerConnection.findFirst({
-      where: { clientPubkey, status: { in: ['ACTIVE', 'PENDING'] } },
+      where: {
+        clientPubkey,
+        status: { in: ['ACTIVE', 'PENDING'] },
+        nsecKey: { publicKey: signerPubkey },
+      },
       include: { permissions: true, nsecKey: true },
       orderBy: { createdAt: 'desc' },
     });
