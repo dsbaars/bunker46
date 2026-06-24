@@ -21,17 +21,19 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly totpService: TotpService,
-    @Inject('JWT_SECRET') private readonly jwtSecret: string,
+    @Inject('REFRESH_TOKEN_SECRET') private readonly refreshTokenSecret: string,
   ) {}
 
   /**
    * Keyed hash of a refresh token for storage/lookup. Refresh tokens are high-entropy random
-   * values, so an HMAC (not a slow password hash) is sufficient; keying with the server secret
-   * means a database-only leak cannot precompute or replay tokens. The domain-separation prefix
-   * keeps this hash distinct from any other use of the same secret.
+   * values, so an HMAC (not a slow password hash) is sufficient; keying with the server's
+   * refresh-token secret means a database-only leak cannot precompute or replay tokens. The
+   * domain-separation prefix keeps this hash distinct from any other use of the same secret.
    */
   private hashRefreshToken(token: string): string {
-    return createHmac('sha256', this.jwtSecret).update(`refresh-token:${token}`).digest('hex');
+    return createHmac('sha256', this.refreshTokenSecret)
+      .update(`refresh-token:${token}`)
+      .digest('hex');
   }
 
   async register(

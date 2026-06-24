@@ -226,6 +226,11 @@ describe('AuthService', () => {
         user: mockUser,
       });
       const result = await authService.refreshTokens('rt');
+      // Look up by the hash of the presented token, never the plaintext.
+      expect(prisma.session?.findUnique).toHaveBeenCalledWith({
+        where: { refreshTokenHash: hashRefreshToken('rt') },
+        include: { user: true },
+      });
       expect(prisma.session?.delete).toHaveBeenCalledWith({ where: { id: 's1' } });
       expect(result.accessToken).toBe('access-token');
     });
