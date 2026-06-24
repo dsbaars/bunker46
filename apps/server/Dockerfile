@@ -41,5 +41,7 @@ RUN chmod +x ./docker-entrypoint.sh
 
 USER bunker
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/docs || exit 1
+# node:24-slim ships no wget/curl, and /api/docs (Swagger) is disabled in production,
+# so probe with Node itself against the public /api/auth/config endpoint.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s CMD ["node", "-e", "require('http').get('http://localhost:3000/api/auth/config',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 ENTRYPOINT ["./docker-entrypoint.sh"]

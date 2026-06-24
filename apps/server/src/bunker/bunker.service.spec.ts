@@ -11,6 +11,7 @@ vi.mock('nostr-tools/pool', () => ({
       subscribe: vi.fn().mockReturnValue({ close: vi.fn() }),
       close: vi.fn(),
       publish: vi.fn().mockResolvedValue(undefined),
+      listConnectionStatus: vi.fn().mockReturnValue(new Map<string, boolean>()),
     };
   }),
   useWebSocketImplementation: vi.fn(),
@@ -116,6 +117,77 @@ describe('BunkerService', () => {
       const [relays] = (poolInstance?.subscribe as ReturnType<typeof vi.fn>)?.mock.calls[0] ?? [];
       expect(Array.isArray(relays)).toBe(true);
       expect(relays.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('connection watchdog', () => {
+    // Build a service whose pool reports the given relay connection status, and
+    // invoke the watchdog's check directly (avoids fragile fake-timer machinery).
+    async function makeService(status: Map<string, boolean>) {
+      const poolModule = await import('nostr-tools/pool');
+      const subscribe = vi.fn().mockReturnValue({ close: vi.fn() });
+      const listConnectionStatus = vi.fn().mockReturnValue(status);
+      vi.mocked(poolModule.SimplePool).mockImplementationOnce(function (this: unknown) {
+        return {
+          subscribe,
+          close: vi.fn(),
+          publish: vi.fn().mockResolvedValue(undefined),
+          listConnectionStatus,
+        };
+      });
+      const svc = new BunkerService(
+        rpcHandler as BunkerRpcHandler,
+        prisma as PrismaService,
+        encryption as EncryptionService,
+        [...NOSTR_CONSTANTS.DEFAULT_RELAYS],
+      );
+      await svc.onModuleInit();
+      const runWatchdog = () => (svc as unknown as { checkConnections(): void }).checkConnections();
+      return { svc, subscribe, listConnectionStatus, runWatchdog };
+    }
+
+    it('schedules a periodic check on init', async () => {
+      const spy = vi.spyOn(globalThis, 'setInterval');
+      const { svc } = await makeService(new Map());
+      expect(spy).toHaveBeenCalledWith(
+        expect.any(Function),
+        NOSTR_CONSTANTS.RELAY_WATCHDOG_INTERVAL_MS,
+      );
+      await svc.onModuleDestroy();
+      spy.mockRestore();
+    });
+
+    it('re-subscribes a listener when its relay connection has dropped', async () => {
+      // Empty status map => relay reported as not connected => watchdog must act.
+      const { svc, subscribe, listConnectionStatus, runWatchdog } = await makeService(new Map());
+
+      const pubkey = 'a'.repeat(64);
+      svc.startListeningForKey(pubkey, 'b'.repeat(64), ['wss://relay.example.com']);
+      expect(subscribe).toHaveBeenCalledTimes(1);
+
+      runWatchdog();
+
+      expect(listConnectionStatus).toHaveBeenCalled();
+      expect(subscribe).toHaveBeenCalledTimes(2);
+      expect(svc.isListening(pubkey)).toBe(true);
+
+      await svc.onModuleDestroy();
+    });
+
+    it('leaves a listener untouched while its relays stay connected', async () => {
+      // Note: status keys are normalized URLs (bare host gains a trailing slash).
+      const { svc, subscribe, runWatchdog } = await makeService(
+        new Map([['wss://relay.example.com/', true]]),
+      );
+
+      svc.startListeningForKey('a'.repeat(64), 'b'.repeat(64), ['wss://relay.example.com']);
+      expect(subscribe).toHaveBeenCalledTimes(1);
+
+      runWatchdog();
+
+      expect(subscribe).toHaveBeenCalledTimes(1);
+
+      await svc.onModuleDestroy();
     });
   });
 });

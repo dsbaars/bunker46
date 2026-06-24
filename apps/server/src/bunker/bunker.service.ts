@@ -16,12 +16,15 @@ import { NOSTR_CONSTANTS, NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN } from '@bunker46
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { useWebSocketImplementation } from 'nostr-tools/pool';
+import { normalizeURL } from 'nostr-tools/utils';
 import WebSocket from 'ws';
 
 useWebSocketImplementation(WebSocket);
 
 interface ActiveListener {
   relays: string[];
+  /** Decrypted signer nsec (hex), kept so the watchdog can re-subscribe on disconnect. */
+  nsecHex: string;
   close: () => void;
 }
 
@@ -37,6 +40,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
   private pool: SimplePool;
   private activeListeners = new Map<string, ActiveListener>();
   private pendingSecrets = new Map<string, PendingSecretInfo>();
+  private watchdogHandle?: ReturnType<typeof setInterval>;
 
   constructor(
     private readonly rpcHandler: BunkerRpcHandler,
@@ -56,15 +60,75 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
     });
 
     await this.resumeAllListeners();
+    this.startConnectionWatchdog();
   }
 
   async onModuleDestroy() {
+    if (this.watchdogHandle) {
+      clearInterval(this.watchdogHandle);
+      this.watchdogHandle = undefined;
+    }
     for (const [pubkey, listener] of this.activeListeners) {
       listener.close();
       this.logger.debug(`Stopped listener for ${pubkey.slice(0, 12)}...`);
     }
     this.activeListeners.clear();
     this.pool.close([...this.defaultRelays]);
+  }
+
+  /**
+   * Periodically verify every active listener still has live relay connections
+   * and re-subscribe the ones that dropped. nostr-tools' own `enableReconnect`
+   * gives up when a socket dies with an `error` event (it sets `skipReconnection`
+   * and removes the relay from the pool), so without this the listener stays dead
+   * until the process restarts. This watchdog makes recovery automatic.
+   */
+  private startConnectionWatchdog() {
+    if (this.watchdogHandle) return;
+    this.watchdogHandle = setInterval(
+      () => this.checkConnections(),
+      NOSTR_CONSTANTS.RELAY_WATCHDOG_INTERVAL_MS,
+    );
+    // Don't let the watchdog keep the event loop alive on its own.
+    this.watchdogHandle.unref?.();
+    this.logger.log(
+      `Relay connection watchdog started (every ${NOSTR_CONSTANTS.RELAY_WATCHDOG_INTERVAL_MS / 1000}s)`,
+    );
+  }
+
+  private checkConnections() {
+    if (this.activeListeners.size === 0) return;
+    // Defensive: skip if the pool implementation lacks status introspection.
+    if (typeof this.pool.listConnectionStatus !== 'function') return;
+
+    const status = this.pool.listConnectionStatus();
+    // Collect first, then restart: restartListener() mutates activeListeners
+    // (delete + re-add), which would otherwise re-enter this iteration and loop
+    // forever while a relay stays down.
+    const toRestart: string[] = [];
+    for (const [pubkey, listener] of this.activeListeners) {
+      const dead = listener.relays.filter((url) => status.get(normalizeURL(url)) !== true);
+      if (dead.length === 0) continue;
+
+      this.logger.warn(
+        `Relay(s) disconnected for ${pubkey.slice(0, 12)}...: ${dead.join(', ')} – re-subscribing`,
+      );
+      toRestart.push(pubkey);
+    }
+    for (const pubkey of toRestart) {
+      this.restartListener(pubkey);
+    }
+  }
+
+  /** Tear down and recreate a listener's subscription across all its relays. */
+  private restartListener(pubkey: string) {
+    const listener = this.activeListeners.get(pubkey);
+    if (!listener) return;
+
+    const { relays, nsecHex } = listener;
+    listener.close();
+    this.activeListeners.delete(pubkey);
+    this.startListeningForKey(pubkey, nsecHex, relays);
   }
 
   registerPendingSecret(signerPubkey: string, secret: string, info: PendingSecretInfo) {
@@ -175,6 +239,7 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
 
     this.activeListeners.set(signerPubkeyHex, {
       relays: effectiveRelays,
+      nsecHex: signerNsecHex,
       close: () => sub.close(),
     });
 
