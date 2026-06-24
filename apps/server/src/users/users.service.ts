@@ -1,27 +1,70 @@
 import {
   Injectable,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import * as argon2 from 'argon2';
+import { Prisma } from '@/generated/prisma/client.js';
 import type { User } from '@/generated/prisma/client.js';
 
 @Injectable()
 export class UsersService {
+  /**
+   * Stable advisory-lock key that serializes account registration so the
+   * "first account only" bootstrap gate is atomic.
+   */
+  private static readonly REGISTRATION_LOCK_KEY = 4_621_046;
+
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(username: string, password: string): Promise<User> {
-    const existing = await this.prisma.user.findUnique({ where: { username } });
-    if (existing) {
-      throw new ConflictException('Username already taken');
-    }
-
+  /**
+   * Create a user account.
+   *
+   * When `allowWhenUsersExist` is false — the first-run bootstrap path where
+   * public registration is disabled — creation is only permitted while the
+   * users table is empty. The count check and the insert run inside one
+   * transaction guarded by a Postgres advisory lock, so two concurrent
+   * bootstrap requests cannot both observe an empty table and each create an
+   * account.
+   */
+  async create(
+    username: string,
+    password: string,
+    options: { allowWhenUsersExist?: boolean } = {},
+  ): Promise<User> {
+    const { allowWhenUsersExist = true } = options;
+    // Hash before opening the transaction so the slow argon2 work does not hold
+    // the advisory lock.
     const passwordHash = await argon2.hash(password);
-    return this.prisma.user.create({
-      data: { username, passwordHash },
-    });
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Serialize registrations against each other; the lock auto-releases
+        // when the transaction commits or rolls back.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${UsersService.REGISTRATION_LOCK_KEY})`;
+
+        if (!allowWhenUsersExist && (await tx.user.count()) > 0) {
+          throw new ForbiddenException('Registration is disabled');
+        }
+
+        const existing = await tx.user.findUnique({ where: { username } });
+        if (existing) {
+          throw new ConflictException('Username already taken');
+        }
+
+        return tx.user.create({ data: { username, passwordHash } });
+      });
+    } catch (err) {
+      // Lost a same-username race past the findUnique check: the unique index is
+      // the final arbiter. Surface the friendly 409 instead of a raw 500.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException('Username already taken');
+      }
+      throw err;
+    }
   }
 
   async count(): Promise<number> {

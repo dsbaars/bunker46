@@ -136,6 +136,7 @@ describe('AuthController', () => {
         'newuser',
         'securepass8',
         expect.any(Object),
+        { allowWhenUsersExist: false },
       );
     });
 
@@ -146,6 +147,7 @@ describe('AuthController', () => {
         'newuser',
         'securepass8',
         expect.any(Object),
+        { allowWhenUsersExist: true },
       );
     });
 
