@@ -99,13 +99,16 @@ export class UsersService {
     const valid = await argon2.verify(user.passwordHash, currentPassword);
     if (!valid) throw new UnauthorizedException('Current password is incorrect');
     const passwordHash = await argon2.hash(newPassword);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
-    // H1: invalidate every other refresh-token session so a leaked or stale token cannot survive a
-    // password change — the canonical post-compromise remediation. Access tokens are stateless and
-    // expire on their own (~15m); this kills the long-lived refresh sessions. The caller's current
-    // session is preserved so the user who just changed their password stays signed in here.
-    await this.prisma.session.deleteMany({
-      where: keepSessionId ? { userId, id: { not: keepSessionId } } : { userId },
+    // H1: write the new hash AND invalidate every other refresh-token session atomically, so a crash
+    // between the two cannot persist the new password while leaving old sessions valid. A leaked or
+    // stale token must not survive a password change — the canonical post-compromise remediation.
+    // Access tokens are stateless and expire on their own (~15m); this kills the long-lived refresh
+    // sessions. The caller's current session is preserved so the user stays signed in here.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+      await tx.session.deleteMany({
+        where: keepSessionId ? { userId, id: { not: keepSessionId } } : { userId },
+      });
     });
   }
 
