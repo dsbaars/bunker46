@@ -7,8 +7,8 @@ services:
       POSTGRES_DB: bunker46
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Not published to the host: the server reaches Postgres over the internal Docker network
+    # (db:5432). For local host access use docker-compose.dev.yml instead.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bunker46"]
       interval: 5s
@@ -17,8 +17,7 @@ services:
 
   redis:
     image: redis:8-alpine
-    ports:
-      - "6379:6379"
+    # Not published to the host: only reachable over the internal Docker network (redis:6379).
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -36,18 +35,22 @@ services:
       PORT: 3000
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://bunker46:bunker46@db:5432/bunker46
-      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-random-string-at-least-32-chars}
+      # Secrets have NO defaults on purpose: the server fails to start unless you provide strong
+      # values (e.g. in a .env file next to this compose). Generate with `openssl rand -base64 48`.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to a strong random value (openssl rand -base64 48)}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-to-another-random-string-32-chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET to a strong random value}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-to-a-secure-encryption-key-min-32}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY to a strong random value (openssl rand -base64 48)}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
       REDIS_URL: redis://redis:6379
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Bunker46}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      # Public sign-ups disabled by default in production; the very first account can still be
+      # created (first-run bootstrap). Set ALLOW_REGISTRATION=true to allow open registration.
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
       # Comma-separated wss:// relay URLs when none are stored in DB; omit for built-in defaults
       NOSTR_DEFAULT_RELAYS: ${NOSTR_DEFAULT_RELAYS:-}
     depends_on:

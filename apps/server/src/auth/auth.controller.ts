@@ -115,6 +115,7 @@ export class AuthController {
   @Post('totp/verify')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   async verifyTotp(
     @Req() req: FastifyRequest & { user: { sub: string } },

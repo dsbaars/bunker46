@@ -8,15 +8,22 @@ function hasBearerToken(req: { headers?: Record<string, string | string[] | unde
 }
 
 /**
- * Skips throttling when:
- * - The request has an Authorization Bearer token (authenticated), so live refresh and normal API use do not hit limits.
- * - Not in production and the request is from localhost (E2E and local dev).
+ * Throttling-skip policy.
+ *
+ * In production, nothing is skipped: authenticated (bearer) traffic is rate limited like any other
+ * request. A blanket bearer-token bypass would disable rate limiting for all real API use and leave
+ * authenticated flows (e.g. TOTP verification) open to brute force.
+ *
+ * Outside production, requests are skipped for local development and E2E convenience:
+ * - any bearer-authenticated request (E2E exercises authenticated flows heavily), or
+ * - any request originating from localhost.
  */
 export class E2eThrottlerGuard extends ThrottlerGuard {
   protected async shouldSkip(context: ExecutionContext): Promise<boolean> {
+    if (process.env['NODE_ENV'] === 'production') return false;
+
     const { req } = this.getRequestResponse(context);
     if (hasBearerToken(req)) return true;
-    if (process.env['NODE_ENV'] === 'production') return false;
     const ip =
       typeof req.ip === 'string'
         ? req.ip

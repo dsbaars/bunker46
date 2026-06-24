@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { TotpVerifiedGuard } from '../auth/guards/totp-verified.guard.js';
 import { ConnectionsService } from './connections.service.js';
 import { BunkerService } from '../bunker/bunker.service.js';
 import {
@@ -30,7 +31,7 @@ type AuthReq = FastifyRequest & { user: { sub: string } };
 
 @ApiTags('connections')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TotpVerifiedGuard)
 @Controller('api/connections')
 export class ConnectionsController {
   constructor(
