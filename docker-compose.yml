@@ -45,6 +45,10 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY to a strong random value (openssl rand -base64 48)}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      # Defaults to Secure refresh cookies in production. Set COOKIE_SECURE=false when serving over
+      # plain HTTP on a trusted network (e.g. http://host:8080), otherwise the browser drops the Secure
+      # cookie and users are logged out on every page reload. Prefer serving over HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
       REDIS_URL: redis://redis:6379
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Bunker46}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
