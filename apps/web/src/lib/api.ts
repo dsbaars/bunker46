@@ -12,7 +12,10 @@ class ApiClient {
   }
 
   async get<T>(path: string): Promise<T> {
-    const res = await fetch(`${BASE_URL}${path}`, { headers: this.getHeaders() });
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
     if (!res.ok) throw await this.handleError(res);
     return res.json();
   }
@@ -22,6 +25,7 @@ class ApiClient {
       method: 'POST',
       headers: this.getHeaders(!!body),
       body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include',
     });
     if (!res.ok) throw await this.handleError(res);
     return res.json();
@@ -32,6 +36,7 @@ class ApiClient {
       method: 'PUT',
       headers: this.getHeaders(true),
       body: JSON.stringify(body),
+      credentials: 'include',
     });
     if (!res.ok) throw await this.handleError(res);
     return res.json();
@@ -42,6 +47,7 @@ class ApiClient {
       method: 'PATCH',
       headers: this.getHeaders(true),
       body: JSON.stringify(body),
+      credentials: 'include',
     });
     if (!res.ok) throw await this.handleError(res);
     return res.json();
@@ -51,6 +57,7 @@ class ApiClient {
     const res = await fetch(`${BASE_URL}${path}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
+      credentials: 'include',
     });
     if (!res.ok) throw await this.handleError(res);
   }

@@ -19,6 +19,10 @@ export type TotpVerify = z.infer<typeof TotpVerifySchema>;
 
 export const AuthTokensSchema = z.object({
   accessToken: z.string(),
+  /**
+   * @deprecated The refresh token is delivered as an httpOnly cookie and is no longer returned in
+   * the response body. This optional field is retained only for backward-compatible typing.
+   */
   refreshToken: z.string().optional(),
 });
 export type AuthTokens = z.infer<typeof AuthTokensSchema>;

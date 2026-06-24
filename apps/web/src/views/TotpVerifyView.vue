@@ -20,10 +20,10 @@ async function handleVerify() {
   error.value = '';
   loading.value = true;
   try {
-    const res = await api.post<{ accessToken: string; refreshToken: string }>('/auth/totp/verify', {
+    const res = await api.post<{ accessToken: string }>('/auth/totp/verify', {
       code: code.value,
     });
-    auth.setTokens(res.accessToken, res.refreshToken);
+    auth.setTokens(res.accessToken);
     const profile = await api.get<any>('/users/me');
     auth.setUser(profile);
     await settings.load(res.accessToken);

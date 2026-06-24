@@ -9,7 +9,6 @@ describe('ApiClient', () => {
     vi.stubGlobal('fetch', mockFetch);
     $auth.set({
       accessToken: 'test-token',
-      refreshToken: 'r',
       user: null,
       requiresTotp: false,
     });

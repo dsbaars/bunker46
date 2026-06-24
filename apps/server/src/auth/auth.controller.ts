@@ -6,11 +6,13 @@ import {
   Body,
   UseGuards,
   Req,
+  Res,
   HttpCode,
   HttpStatus,
   Get,
   Param,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -22,7 +24,31 @@ import { PasskeyService } from './passkey.service.js';
 import { UsersService } from '../users/users.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { TotpVerifiedGuard } from './guards/totp-verified.guard.js';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+
+/** httpOnly cookie that carries the refresh token; never exposed to browser JavaScript. */
+const REFRESH_COOKIE = 'refresh_token';
+
+/**
+ * Cookie attributes shared by set and clear. Browsers only delete a cookie when the clear call's
+ * attributes match those it was set with, so both paths must use the same values.
+ */
+function refreshCookieAttrs() {
+  return {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: 'lax' as const,
+    // Scope to the auth routes that consume it (refresh, logout), so it is not sent on every request.
+    path: '/api/auth',
+  };
+}
+
+function refreshCookieOptions() {
+  // Keep in sync with AuthService's refresh-token expiry — both derive days from
+  // JWT_REFRESH_EXPIRES_IN (default 7d) so the cookie lifetime matches the DB session expiry.
+  const days = parseInt(process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d') || 7;
+  return { ...refreshCookieAttrs(), maxAge: days * 24 * 60 * 60 };
+}
 
 function sessionContextFromRequest(req: FastifyRequest): {
   ipAddress?: string;
@@ -53,6 +79,26 @@ export class AuthController {
     private readonly usersService: UsersService,
   ) {}
 
+  /**
+   * Move the refresh token into an httpOnly cookie and strip it from the JSON body, so it is never
+   * readable by browser JavaScript. Results without a refresh token (e.g. the partial-token TOTP
+   * step, or a failed passkey verify) are returned unchanged.
+   */
+  private issueSession(
+    reply: FastifyReply,
+    result: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const { refreshToken, ...rest } = result;
+    if (typeof refreshToken === 'string') {
+      reply.setCookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions());
+    }
+    return rest;
+  }
+
+  private clearRefreshCookie(reply: FastifyReply): void {
+    reply.clearCookie(REFRESH_COOKIE, refreshCookieAttrs());
+  }
+
   @Get('config')
   async getAuthConfig() {
     const loginNotice = process.env['LOGIN_NOTICE']?.trim() || null;
@@ -77,7 +123,11 @@ export class AuthController {
 
   @Post('register')
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })
-  async register(@Req() req: FastifyRequest, @Body() body: unknown) {
+  async register(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+    @Body() body: unknown,
+  ) {
     const registrationAllowed = isRegistrationAllowed();
     // Cheap pre-check so we do not hash a password for requests that cannot
     // succeed. The authoritative, race-free gate (the very first account may be
@@ -90,27 +140,33 @@ export class AuthController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.flatten().fieldErrors as Record<string, string[]>);
     }
-    return this.authService.register(
+    const result = await this.authService.register(
       parsed.data.username,
       parsed.data.password,
       sessionContextFromRequest(req),
       { allowWhenUsersExist: registrationAllowed },
     );
+    return this.issueSession(reply, result);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })
-  async login(@Req() req: FastifyRequest, @Body() body: unknown) {
+  async login(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+    @Body() body: unknown,
+  ) {
     const parsed = LoginRequestSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.flatten().fieldErrors as Record<string, string[]>);
     }
-    return this.authService.login(
+    const result = await this.authService.login(
       parsed.data.username,
       parsed.data.password,
       sessionContextFromRequest(req),
     );
+    return this.issueSession(reply, result);
   }
 
   // The ONLY authenticated endpoint that intentionally accepts a pre-TOTP partial token: it is the
@@ -123,9 +179,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async verifyTotp(
     @Req() req: FastifyRequest & { user: { sub: string } },
+    @Res({ passthrough: true }) reply: FastifyReply,
     @Body() body: { code: string },
   ) {
-    return this.authService.verifyTotp(req.user.sub, body.code, sessionContextFromRequest(req));
+    const result = await this.authService.verifyTotp(
+      req.user.sub,
+      body.code,
+      sessionContextFromRequest(req),
+    );
+    return this.issueSession(reply, result);
   }
 
   @Post('totp/setup')
@@ -170,14 +232,26 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })
-  async refresh(@Req() req: FastifyRequest, @Body() body: { refreshToken: string }) {
-    return this.authService.refreshTokens(body.refreshToken, sessionContextFromRequest(req));
+  async refresh(@Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    const refreshToken = req.cookies?.[REFRESH_COOKIE];
+    if (!refreshToken) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
+    const result = await this.authService.refreshTokens(
+      refreshToken,
+      sessionContextFromRequest(req),
+    );
+    return this.issueSession(reply, result);
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Body() body: { refreshToken: string }) {
-    await this.authService.logout(body.refreshToken);
+  async logout(@Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    const refreshToken = req.cookies?.[REFRESH_COOKIE];
+    if (refreshToken) {
+      await this.authService.logout(refreshToken);
+    }
+    this.clearRefreshCookie(reply);
     return { success: true };
   }
 
@@ -244,6 +318,7 @@ export class AuthController {
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   async passkeyLoginVerify(
     @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
     @Body() body: { userId?: string; response: AuthenticationResponseJSON },
   ) {
     const { verification, userId } = await this.passkeyService.verifyAuthentication(
@@ -251,10 +326,11 @@ export class AuthController {
       body.userId,
     );
     if (!verification.verified) return { verified: false };
-    return {
-      verified: true,
-      ...(await this.authService.loginWithPasskey(userId!, sessionContextFromRequest(req))),
-    };
+    const session = await this.authService.loginWithPasskey(
+      userId!,
+      sessionContextFromRequest(req),
+    );
+    return this.issueSession(reply, { verified: true, ...session });
   }
 
   @Get('passkey')

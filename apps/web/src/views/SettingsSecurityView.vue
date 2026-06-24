@@ -98,7 +98,7 @@ async function confirmTotp() {
       totpSetup.value = null;
       totpCode.value = '';
       if (res.requireReauth) {
-        auth.logout();
+        await auth.logout();
         router.push({ path: '/login', query: { totpEnabled: '1' } });
         return;
       }
@@ -199,7 +199,7 @@ async function revokeSession(session: SessionItem) {
   try {
     await api.delete(`/auth/sessions/${session.id}`);
     if (session.current) {
-      auth.logout();
+      await auth.logout();
       settingsStore.clear();
       router.push('/login');
       return;
@@ -218,7 +218,7 @@ async function revokeAllOtherSessions() {
     await loadSessions();
     // If no sessions left (e.g. JWT had no sessionId so backend revoked all), log out
     if (sessions.value.length === 0) {
-      auth.logout();
+      await auth.logout();
       settingsStore.clear();
       router.push('/login');
     }
