@@ -5,7 +5,7 @@
 </p>
 
 [![CI](https://github.com/dsbaars/bunker46/actions/workflows/ci.yml/badge.svg)](https://github.com/dsbaars/bunker46/actions/workflows/ci.yml)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue)](https://www.typescriptlang.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-brightgreen)](https://vuejs.org/)
 [![Node](https://img.shields.io/badge/Node-24+-green)](https://nodejs.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-10+-orange)](https://pnpm.io/)
@@ -29,7 +29,7 @@ Screenshots are captured with Playwright (WebP). The connections screenshot uses
 
 | Layer        | Technology                                                                   |
 | ------------ | ---------------------------------------------------------------------------- |
-| **Frontend** | Vue 3, Vite 7, Tailwind CSS v4, shadcn-vue, nanostores, localforage          |
+| **Frontend** | Vue 3, Vite 8, Tailwind CSS v4, shadcn-vue, nanostores, localforage          |
 | **Backend**  | NestJS 11, Fastify, Prisma ORM 7 (driver adapter), nostr-tools               |
 | **Database** | PostgreSQL 17                                                                |
 | **Auth**     | JWT + Argon2, TOTP (otplib), WebAuthn/Passkeys (@simplewebauthn)             |
@@ -209,7 +209,7 @@ To check for outdated packages across the monorepo:
 pnpm outdated -r
 ```
 
-Several dependencies have newer major versions available (e.g. Prisma 7, Vitest 4, Vue Router 5, Zod 4). Upgrade when ready and run tests; pin to current majors if you prefer stability.
+The monorepo tracks current major versions (TypeScript 6, Vite 8, Prisma 7, Vitest 4, Vue Router 5, Zod 4). Run `pnpm outdated -r` periodically and upgrade deliberately, running the full test suite after each bump.
 
 ## License
 
