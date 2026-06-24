@@ -123,6 +123,15 @@ function removeSeedPerm(p: PickPerm) {
   seedPerms.value = seedPerms.value.filter((x) => permLabel(x) !== permLabel(p));
 }
 
+// Grant every gated method for all kinds, or clear the whole selection.
+const allMethodsAllKinds = computed(() => GATED_METHODS.every((m) => isSeedAllKinds(m)));
+function grantAllSeed() {
+  seedPerms.value = GATED_METHODS.map((method) => ({ method }));
+}
+function revokeAllSeed() {
+  seedPerms.value = [];
+}
+
 function addSeedKind() {
   const kind = Number.parseInt(newSeedKind.value, 10);
   if (!Number.isInteger(kind) || kind < 0) return;
@@ -395,6 +404,26 @@ function statusVariant(status: string) {
           </p>
 
           <div class="rounded-lg border border-border divide-y divide-border/50">
+            <!-- Master toggle: grant every gated method (all kinds) at once, or clear all. -->
+            <div class="flex items-center justify-between px-3 py-2 bg-muted/30">
+              <span class="text-sm font-medium">All permissions</span>
+              <button
+                type="button"
+                :class="[
+                  'w-12 h-6 rounded-full transition-colors cursor-pointer relative',
+                  allMethodsAllKinds ? 'bg-primary' : 'bg-muted',
+                ]"
+                :title="allMethodsAllKinds ? 'Clear all' : 'Grant all (all kinds)'"
+                @click="allMethodsAllKinds ? revokeAllSeed() : grantAllSeed()"
+              >
+                <span
+                  :class="[
+                    'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform',
+                    allMethodsAllKinds ? 'left-6' : 'left-0.5',
+                  ]"
+                />
+              </button>
+            </div>
             <div
               v-for="method in GATED_METHODS"
               :key="method"
