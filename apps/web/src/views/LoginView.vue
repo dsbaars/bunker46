@@ -41,10 +41,10 @@ const passkeyLoading = ref(false);
 const showPasskeyForm = ref(false);
 
 /** Normalize token keys from API (camelCase or snake_case). */
-function tokensFrom(res: Record<string, unknown>): { accessToken?: string; refreshToken?: string } {
+function tokensFrom(res: Record<string, unknown>): { accessToken?: string } {
+  // The refresh token is delivered as an httpOnly cookie by the server, never in the JSON body.
   const accessToken = (res.accessToken as string) ?? (res.access_token as string);
-  const refreshToken = (res.refreshToken as string) ?? (res.refresh_token as string);
-  return { accessToken, refreshToken };
+  return { accessToken };
 }
 
 async function handleLogin() {
@@ -64,13 +64,13 @@ async function handleLogin() {
       return;
     }
 
-    const { accessToken, refreshToken } = tokensFrom(res);
+    const { accessToken } = tokensFrom(res);
     if (!accessToken) {
       error.value = 'Invalid response from server. Please try again.';
       return;
     }
 
-    auth.setTokens(accessToken, refreshToken);
+    auth.setTokens(accessToken);
     try {
       const profile = await api.get<UserProfileDto>('/users/me');
       auth.setUser(profile);
@@ -117,9 +117,9 @@ async function handlePasskeyLogin() {
     );
 
     const verified = res.verified === true;
-    const { accessToken, refreshToken } = tokensFrom(res);
+    const { accessToken } = tokensFrom(res);
     if (verified && accessToken) {
-      auth.setTokens(accessToken, refreshToken);
+      auth.setTokens(accessToken);
       try {
         const profile = await api.get<UserProfileDto>('/users/me');
         auth.setUser(profile);

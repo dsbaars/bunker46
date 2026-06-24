@@ -29,10 +29,10 @@ const confirmPassword = ref('');
 const error = ref('');
 const loading = ref(false);
 
-function tokensFrom(res: Record<string, unknown>): { accessToken?: string; refreshToken?: string } {
+function tokensFrom(res: Record<string, unknown>): { accessToken?: string } {
+  // The refresh token is delivered as an httpOnly cookie by the server, never in the JSON body.
   const accessToken = (res.accessToken as string) ?? (res.access_token as string);
-  const refreshToken = (res.refreshToken as string) ?? (res.refresh_token as string);
-  return { accessToken, refreshToken };
+  return { accessToken };
 }
 
 async function handleRegister() {
@@ -47,9 +47,9 @@ async function handleRegister() {
       username: username.value,
       password: password.value,
     });
-    const { accessToken, refreshToken } = tokensFrom(res);
+    const { accessToken } = tokensFrom(res);
     if (accessToken) {
-      auth.setTokens(accessToken, refreshToken);
+      auth.setTokens(accessToken);
       await settings.load(accessToken);
       router.push('/dashboard');
       return;
