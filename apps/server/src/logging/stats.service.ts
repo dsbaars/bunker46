@@ -68,9 +68,17 @@ export class StatsService {
         },
         _count: { eventKind: true },
       }),
-      this.prisma.bunkerConnection
-        .findMany({ where: { userId }, select: { name: true }, orderBy: { name: 'asc' } })
-        .then((rows) => rows.map((r) => r.name)),
+      // Union of live connection names + names preserved on logs, so deleted connections
+      // (whose logs survive with connectionId=null) remain filterable in the dashboard.
+      Promise.all([
+        this.prisma.bunkerConnection.findMany({ where: { userId }, select: { name: true } }),
+        this.prisma.signingLog.groupBy({ by: ['connectionName'], where: { userId } }),
+      ]).then(([conns, logs]) => {
+        const names = new Set<string>();
+        for (const c of conns) names.add(c.name);
+        for (const l of logs) names.add(l.connectionName);
+        return Array.from(names).sort();
+      }),
       this.prisma.signingLog
         .groupBy({ by: ['method'], where: { userId } })
         .then((rows) => rows.map((r) => r.method).sort()),

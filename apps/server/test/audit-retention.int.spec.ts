@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { LoggingService } from '../src/logging/logging.service.js';
+import { StatsService } from '../src/logging/stats.service.js';
 
 /**
  * DB integration test for audit-log retention (Option B: decoupled signing logs).
@@ -21,11 +22,13 @@ const RUN = process.env['RUN_DB_TESTS'] === '1';
 describe.skipIf(!RUN)('audit-log retention (DB integration)', () => {
   let prisma: PrismaService;
   let logging: LoggingService;
+  let stats: StatsService;
 
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.onModuleInit();
     logging = new LoggingService(prisma);
+    stats = new StatsService(prisma);
   });
 
   afterAll(async () => {
@@ -87,6 +90,19 @@ describe.skipIf(!RUN)('audit-log retention (DB integration)', () => {
     const activity = await logging.getDashboardActivity(user.id);
     expect(activity.total).toBe(1);
     expect(activity.data[0]).toMatchObject({ connectionName: 'My App', method: 'sign_event' });
+  });
+
+  it('still counts orphaned logs in dashboard stats and keeps the deleted name filterable', async () => {
+    const { user, conn } = await seedConnectionWithLog();
+    await prisma.bunkerConnection.delete({ where: { id: conn.id } });
+
+    const s = await stats.getDashboardStats(user.id, '7d');
+
+    // The orphaned log (connectionId=null) is still aggregated into counts/charts via userId...
+    expect(s.signingActions7d).toBe(1);
+    expect(s.signingByMethod['sign_event']).toBe(1);
+    // ...and the deleted connection's name remains in the filter list (sourced from the logs).
+    expect(s.connectionNames).toContain('My App');
   });
 
   it('purges signing logs when the owning user is deleted (user FK cascades)', async () => {
