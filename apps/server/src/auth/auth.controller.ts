@@ -30,13 +30,28 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 const REFRESH_COOKIE = 'refresh_token';
 
 /**
+ * Whether the refresh cookie is marked `Secure` (sent only over HTTPS). Defaults to true in
+ * production so a real deployment never ships the refresh token over plaintext. A `Secure` cookie
+ * is silently dropped by the browser when the app is served over plain HTTP on a non-localhost host,
+ * which makes every page reload log the user out (the reload can only restore the session by
+ * exchanging this cookie). Operators serving over plain HTTP on a trusted network (e.g. a LAN-only
+ * http://host:port) must therefore set `COOKIE_SECURE=false`; ideally, serve the app over HTTPS.
+ */
+function isCookieSecure(): boolean {
+  const override = process.env['COOKIE_SECURE'];
+  if (override === 'true') return true;
+  if (override === 'false') return false;
+  return process.env['NODE_ENV'] === 'production';
+}
+
+/**
  * Cookie attributes shared by set and clear. Browsers only delete a cookie when the clear call's
  * attributes match those it was set with, so both paths must use the same values.
  */
 function refreshCookieAttrs() {
   return {
     httpOnly: true,
-    secure: process.env['NODE_ENV'] === 'production',
+    secure: isCookieSecure(),
     sameSite: 'lax' as const,
     // Scope to the auth routes that consume it (refresh, logout), so it is not sent on every request.
     path: '/api/auth',
