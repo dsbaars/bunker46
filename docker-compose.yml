@@ -28,8 +28,10 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
+    # The web (Caddy) service reaches the API over the internal Docker network (server:3000);
+    # bind the host port to loopback only so the API is not exposed on the public interface.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       NODE_ENV: production
       PORT: 3000

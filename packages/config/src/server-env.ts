@@ -4,16 +4,21 @@ import { NOSTR_CONSTANTS } from './constants.js';
 
 /**
  * Placeholder/insecure secret detection for production fail-closed checks.
- * These match the values shipped in `.env.example` / docker-compose defaults, so a verbatim
- * copy-paste deployment refuses to start instead of running with publicly-known secrets.
+ * Hyphenated/word forms keep these specific enough that a real high-entropy secret is very unlikely
+ * to match by accident, while still rejecting a verbatim copy of the shipped `.env.example` /
+ * docker-compose defaults (all of which contain "change-me").
  */
-const PLACEHOLDER_SECRET_PATTERNS = [/change-?me/i, /placeholder/i, /your-?secret/i, /example/i];
+const PLACEHOLDER_SECRET_PATTERNS = [/change-me/i, /placeholder/i, /your-secret/i];
 
-/** True when a production secret is an obvious placeholder or has trivially low entropy. */
+/**
+ * True when a production secret is an obvious placeholder or has trivially low entropy. Errs toward
+ * over-rejection (fail-safe): the worst case is forcing the operator to pick a stronger key.
+ */
 function isInsecureProductionSecret(value: string): boolean {
   if (PLACEHOLDER_SECRET_PATTERNS.some((re) => re.test(value))) return true;
-  // A single repeated character (e.g. "aaaa…") carries effectively no entropy.
-  if (/^(.)\1*$/.test(value)) return true;
+  // Too few distinct characters to be a real random key, e.g. "aaaa…", "abababab…", "abcabc…".
+  // A random 32+ char hex/base64 key has well over a dozen distinct characters.
+  if (new Set(value).size < 5) return true;
   return false;
 }
 

@@ -115,6 +115,19 @@ describe('serverEnvSchema', () => {
       expect(result.success).toBe(false);
     });
 
+    it('rejects a low-distinct-character secret (e.g. "abab…") in production', () => {
+      const result = serverEnvSchema.safeParse({
+        ...baseEnv,
+        ...strongSecrets,
+        NODE_ENV: 'production',
+        ENCRYPTION_KEY: 'ab'.repeat(20), // 40 chars, only 2 distinct characters
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.path[0] === 'ENCRYPTION_KEY')).toBe(true);
+      }
+    });
+
     it('allows placeholder secrets outside production (development default)', () => {
       // baseEnv uses 'a'*32 / 'b'*32 and no NODE_ENV (=> development); must still pass.
       const result = serverEnvSchema.safeParse(baseEnv);
