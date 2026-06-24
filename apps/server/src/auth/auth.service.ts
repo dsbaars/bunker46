@@ -1,9 +1,9 @@
-import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { UsersService } from '../users/users.service.js';
 import { TotpService } from './totp.service.js';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHmac } from 'node:crypto';
 
 interface JwtPayload {
   sub: string;
@@ -21,7 +21,20 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly totpService: TotpService,
+    @Inject('REFRESH_TOKEN_SECRET') private readonly refreshTokenSecret: string,
   ) {}
+
+  /**
+   * Keyed hash of a refresh token for storage/lookup. Refresh tokens are high-entropy random
+   * values, so an HMAC (not a slow password hash) is sufficient; keying with the server's
+   * refresh-token secret means a database-only leak cannot precompute or replay tokens. The
+   * domain-separation prefix keeps this hash distinct from any other use of the same secret.
+   */
+  private hashRefreshToken(token: string): string {
+    return createHmac('sha256', this.refreshTokenSecret)
+      .update(`refresh-token:${token}`)
+      .digest('hex');
+  }
 
   async register(
     username: string,
@@ -103,7 +116,7 @@ export class AuthService {
     sessionContext?: { ipAddress?: string; userAgent?: string },
   ) {
     const session = await this.prisma.session.findUnique({
-      where: { refreshToken },
+      where: { refreshTokenHash: this.hashRefreshToken(refreshToken) },
       include: { user: true },
     });
 
@@ -123,7 +136,9 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    await this.prisma.session.deleteMany({ where: { refreshToken } });
+    await this.prisma.session.deleteMany({
+      where: { refreshTokenHash: this.hashRefreshToken(refreshToken) },
+    });
   }
 
   async listSessions(userId: string, currentSessionId?: string) {
@@ -175,7 +190,7 @@ export class AuthService {
     const session = await this.prisma.session.create({
       data: {
         userId,
-        refreshToken,
+        refreshTokenHash: this.hashRefreshToken(refreshToken),
         expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
         totpVerified,
         ipAddress: sessionContext?.ipAddress ?? null,

@@ -31,6 +31,16 @@ import { EncryptionService } from '../common/crypto/encryption.service.js';
       provide: 'JWT_SECRET',
       useFactory: () => serverEnvSchema.parse(process.env).JWT_SECRET,
     },
+    {
+      // Key for hashing refresh tokens at rest. Prefer the dedicated JWT_REFRESH_SECRET so refresh
+      // sessions can be rotated independently of the access-token signing key; fall back to
+      // JWT_SECRET when it is not set.
+      provide: 'REFRESH_TOKEN_SECRET',
+      useFactory: () => {
+        const env = serverEnvSchema.parse(process.env);
+        return env.JWT_REFRESH_SECRET ?? env.JWT_SECRET;
+      },
+    },
     AuthService,
     JwtStrategy,
     TotpService,
