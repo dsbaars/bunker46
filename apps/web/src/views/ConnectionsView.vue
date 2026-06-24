@@ -2,7 +2,7 @@
 import { ref, watch, onMounted, computed } from 'vue';
 import { useActivityStream } from '@/composables/useActivityStream';
 import { useRouter, useRoute } from 'vue-router';
-import { Link2, KeyRound, Plug, Lock, Unlock, Search } from '@lucide/vue';
+import { Link2, KeyRound, Plug, Lock, Search } from '@lucide/vue';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';
@@ -17,6 +17,9 @@ const route = useRoute();
 const ui = useUiStore();
 const { formatDateTime } = useFormatting();
 
+const grantedCount = (c: Connection) => c.permissions.filter((p) => p.allowed).length;
+const pendingCount = (c: Connection) => c.permissions.filter((p) => !p.allowed).length;
+
 interface Connection {
   id: string;
   name: string;
@@ -28,7 +31,7 @@ interface Connection {
   lastActivity?: string;
   createdAt: string;
   nsecKey: { publicKey: string; label: string };
-  permissions: Array<{ method: string; kind?: number }>;
+  permissions: Array<{ method: string; kind?: number; allowed?: boolean }>;
   _count: { logs: number };
 }
 
@@ -512,21 +515,15 @@ function statusVariant(status: string) {
               /></span>
             </p>
             <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+              <span class="flex items-center gap-1">
+                <Lock class="w-3.5 h-3.5 shrink-0" />
+                {{ grantedCount(conn) }} granted
+              </span>
               <span
-                class="flex items-center gap-1"
-                :class="
-                  conn.permissions.length === 0
-                    ? 'text-amber-600 dark:text-amber-400 font-medium'
-                    : ''
-                "
+                v-if="pendingCount(conn) > 0"
+                class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium"
               >
-                <Unlock v-if="conn.permissions.length === 0" class="w-3.5 h-3.5 shrink-0" />
-                <Lock v-else class="w-3.5 h-3.5 shrink-0" />
-                {{
-                  conn.permissions.length === 0
-                    ? 'Unrestricted'
-                    : `${conn.permissions.length} permissions`
-                }}
+                {{ pendingCount(conn) }} pending
               </span>
               <span>{{ conn._count.logs }} logs</span>
               <span v-if="conn.lastActivity"> Last: {{ formatDateTime(conn.lastActivity) }} </span>

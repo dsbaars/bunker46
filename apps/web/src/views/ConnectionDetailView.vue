@@ -25,16 +25,17 @@ const logs = ref<any[]>([]);
 const loading = ref(true);
 const logsLoading = ref(false);
 
-const NIP46_METHODS = [
-  'connect',
+// Methods the signer gates behind explicit permission (default-deny). The others
+// (connect, ping, get_public_key, switch_relays) are always available.
+const GATED_METHODS = [
   'sign_event',
-  'ping',
-  'get_public_key',
   'nip04_encrypt',
   'nip04_decrypt',
   'nip44_encrypt',
   'nip44_decrypt',
 ];
+
+type Perm = { method: string; kind?: number | null; allowed?: boolean };
 
 onMounted(async () => {
   try {
@@ -51,40 +52,77 @@ onMounted(async () => {
   }
 });
 
-const isUnrestricted = computed(() => {
-  return !connection.value?.permissions?.length;
-});
+const grantedPerms = computed<Perm[]>(() =>
+  ((connection.value?.permissions ?? []) as Perm[]).filter((p) => p.allowed),
+);
+const pendingPerms = computed<Perm[]>(() =>
+  ((connection.value?.permissions ?? []) as Perm[]).filter((p) => !p.allowed),
+);
 
-function isMethodExplicit(method: string) {
-  return connection.value?.permissions?.some((p: any) => p.method === method) ?? false;
+function permLabel(p: Perm) {
+  return p.kind != null ? `${p.method}:${p.kind}` : p.method;
 }
 
-async function togglePermission(method: string) {
-  if (!connection.value) return;
-  const current = connection.value.permissions as Array<{ method: string; kind?: number }>;
-  let updated: Array<{ method: string; kind?: number }>;
-
-  if (isMethodExplicit(method)) {
-    updated = current.filter((p: any) => p.method !== method);
-  } else {
-    updated = [...current, { method }];
-  }
-
-  await api.put(`/connections/${route.params.id}/permissions`, { permissions: updated });
-  connection.value.permissions = updated;
+function isMethodGranted(method: string) {
+  return grantedPerms.value.some((p) => p.method === method);
 }
 
-async function setUnrestricted() {
-  if (!connection.value) return;
-  await api.put(`/connections/${route.params.id}/permissions`, { permissions: [] });
-  connection.value.permissions = [];
+const wirePerm = (p: Perm) => ({ method: p.method, ...(p.kind != null ? { kind: p.kind } : {}) });
+
+async function reloadConnection() {
+  connection.value = await api.get(`/connections/${route.params.id}`);
 }
 
-async function setRestrictedDefaults() {
-  if (!connection.value) return;
-  const defaults = NIP46_METHODS.map((m) => ({ method: m }));
-  await api.put(`/connections/${route.params.id}/permissions`, { permissions: defaults });
-  connection.value.permissions = defaults;
+// Replace the GRANTED whitelist; the backend preserves any pending requests.
+async function setGranted(perms: Perm[]) {
+  await api.put(`/connections/${route.params.id}/permissions`, {
+    permissions: perms.map(wirePerm),
+  });
+  await reloadConnection();
+}
+
+async function grantMethod(method: string) {
+  await setGranted([...grantedPerms.value, { method }]);
+}
+
+async function revokeMethod(method: string) {
+  await setGranted(grantedPerms.value.filter((p) => p.method !== method));
+}
+
+async function revokePerm(perm: Perm) {
+  await setGranted(grantedPerms.value.filter((p) => permLabel(p) !== permLabel(perm)));
+}
+
+async function grantAll() {
+  await setGranted(GATED_METHODS.map((m) => ({ method: m })));
+}
+
+async function revokeAll() {
+  await setGranted([]);
+}
+
+async function approvePerm(perm: Perm) {
+  await api.post(`/connections/${route.params.id}/permissions/approve`, {
+    permissions: [wirePerm(perm)],
+  });
+  await reloadConnection();
+}
+
+async function denyPerm(perm: Perm) {
+  await api.post(`/connections/${route.params.id}/permissions/deny`, {
+    permissions: [wirePerm(perm)],
+  });
+  await reloadConnection();
+}
+
+async function approveAllPending() {
+  await api.post(`/connections/${route.params.id}/permissions/approve`, {});
+  await reloadConnection();
+}
+
+async function denyAllPending() {
+  await api.post(`/connections/${route.params.id}/permissions/deny`, {});
+  await reloadConnection();
 }
 
 async function toggleLogging() {
@@ -232,62 +270,125 @@ function formatTime(ts: string) {
           <h2 class="text-lg font-semibold">Permissions</h2>
           <div class="flex gap-2">
             <button
-              v-if="!isUnrestricted"
               class="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-              @click="setUnrestricted"
+              @click="grantAll"
             >
-              Allow all
+              Grant all
             </button>
             <button
-              v-if="isUnrestricted"
-              class="text-xs text-primary hover:underline cursor-pointer"
-              @click="setRestrictedDefaults"
+              v-if="grantedPerms.length"
+              class="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+              @click="revokeAll"
             >
-              Restrict to whitelist
+              Revoke all
             </button>
           </div>
         </div>
 
+        <!-- Pending requests awaiting operator approval -->
         <div
-          v-if="isUnrestricted"
+          v-if="pendingPerms.length"
           class="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30"
         >
-          <p class="text-sm font-medium text-amber-600 dark:text-amber-400">Unrestricted</p>
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
+              {{ pendingPerms.length }} permission request{{ pendingPerms.length > 1 ? 's' : '' }}
+              awaiting approval
+            </p>
+            <div class="flex gap-2">
+              <button
+                class="text-xs text-primary hover:underline cursor-pointer"
+                @click="approveAllPending"
+              >
+                Approve all
+              </button>
+              <button
+                class="text-xs text-destructive hover:underline cursor-pointer"
+                @click="denyAllPending"
+              >
+                Deny all
+              </button>
+            </div>
+          </div>
+          <div class="space-y-1">
+            <div
+              v-for="perm in pendingPerms"
+              :key="permLabel(perm)"
+              class="flex items-center justify-between py-1"
+            >
+              <span class="text-sm font-mono">{{ permLabel(perm) }}</span>
+              <div class="flex gap-1">
+                <button
+                  class="text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+                  @click="approvePerm(perm)"
+                >
+                  Approve
+                </button>
+                <button
+                  class="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive hover:bg-destructive/20 cursor-pointer"
+                  @click="denyPerm(perm)"
+                >
+                  Deny
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+          <p class="text-sm font-medium text-blue-600 dark:text-blue-400">Default-deny</p>
           <p class="text-xs text-muted-foreground mt-1">
-            No permission whitelist configured. All NIP-46 methods are allowed. Click "Restrict to
-            whitelist" to only allow specific methods.
+            Only the granted permissions below are enforced. <span class="font-mono">connect</span>,
+            <span class="font-mono">ping</span>, <span class="font-mono">get_public_key</span> and
+            <span class="font-mono">switch_relays</span> are always available.
           </p>
         </div>
 
-        <div v-else class="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-          <p class="text-sm font-medium text-blue-600 dark:text-blue-400">Whitelist mode</p>
-          <p class="text-xs text-muted-foreground mt-1">
-            Only explicitly enabled methods are allowed. Toggle individual methods below.
-          </p>
+        <!-- Granted permissions -->
+        <div v-if="grantedPerms.length" class="mb-4">
+          <p class="text-xs text-muted-foreground mb-2">Granted</p>
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="perm in grantedPerms"
+              :key="permLabel(perm)"
+              class="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded bg-primary/10 text-primary"
+            >
+              {{ permLabel(perm) }}
+              <button
+                class="hover:text-destructive cursor-pointer"
+                title="Revoke"
+                @click="revokePerm(perm)"
+              >
+                ×
+              </button>
+            </span>
+          </div>
         </div>
+        <p v-else class="mb-4 text-sm text-muted-foreground">
+          No permissions granted — this connection can only use connect, ping, get_public_key and
+          switch_relays.
+        </p>
 
-        <div class="space-y-2">
+        <!-- Quick toggle for the gated capability methods (method-level, all kinds) -->
+        <div class="space-y-1">
+          <p class="text-xs text-muted-foreground mb-1">Capability methods</p>
           <div
-            v-for="method in NIP46_METHODS"
+            v-for="method in GATED_METHODS"
             :key="method"
             class="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
           >
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-mono">{{ method }}</span>
-              <Badge v-if="isUnrestricted" variant="secondary" class="text-[10px]"> allowed </Badge>
-            </div>
+            <span class="text-sm font-mono">{{ method }}</span>
             <button
-              v-if="!isUnrestricted"
               :class="[
                 'w-12 h-6 rounded-full transition-colors cursor-pointer relative',
-                isMethodExplicit(method) ? 'bg-primary' : 'bg-muted',
+                isMethodGranted(method) ? 'bg-primary' : 'bg-muted',
               ]"
-              @click="togglePermission(method)"
+              @click="isMethodGranted(method) ? revokeMethod(method) : grantMethod(method)"
             >
               <span
                 :class="[
                   'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform',
-                  isMethodExplicit(method) ? 'left-6' : 'left-0.5',
+                  isMethodGranted(method) ? 'left-6' : 'left-0.5',
                 ]"
               />
             </button>

@@ -63,7 +63,7 @@ export class BunkerController {
       name: body.name || 'Bunker46',
     });
 
-    await this.bunkerService.ensureListeningForConnection(body.nsecKeyId, relays);
+    await this.bunkerService.ensureListeningForConnection(body.nsecKeyId, req.user.sub, relays);
 
     const uri = this.uriService.buildBunkerUri(key.publicKey, relays, secret);
     return { uri, secret, signerPubkey: key.publicKey, relays };

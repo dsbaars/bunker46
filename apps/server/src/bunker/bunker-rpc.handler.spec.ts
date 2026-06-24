@@ -6,7 +6,7 @@ import type { EventsService } from '../events/events.service.js';
 import type { EncryptionService } from '../common/crypto/encryption.service.js';
 import type { Nip46Request } from '@bunker46/shared-types';
 
-type Perm = { method: string; kind?: number };
+type Perm = { method: string; kind?: number; allowed?: boolean };
 
 describe('BunkerRpcHandler', () => {
   let handler: BunkerRpcHandler;
@@ -34,7 +34,11 @@ describe('BunkerRpcHandler', () => {
       status,
       relays: ['wss://relay.example.com'],
       secret,
-      permissions: permissions.map((p) => ({ method: p.method, kind: p.kind ?? null })),
+      permissions: permissions.map((p) => ({
+        method: p.method,
+        kind: p.kind ?? null,
+        allowed: p.allowed ?? true,
+      })),
       nsecKey: { encryptedNsec: 'encrypted-nsec' },
     };
   }
@@ -65,6 +69,7 @@ describe('BunkerRpcHandler', () => {
       findByClientAndSigner: vi.fn().mockResolvedValue(null),
       updateConnectionStatus: vi.fn().mockResolvedValue(undefined as never),
       setPermissions: vi.fn().mockResolvedValue(undefined as never),
+      requestPermissions: vi.fn().mockResolvedValue(undefined as never),
       touchActivity: vi.fn().mockResolvedValue(undefined as never),
     };
     loggingService = { logSigningAction: vi.fn().mockResolvedValue(undefined as never) };
@@ -200,15 +205,38 @@ describe('BunkerRpcHandler', () => {
       expect(res.result).toBe('the-secret');
     });
 
-    it('stores explicit permissions sent in the connect request', async () => {
+    it('records client-requested permissions as PENDING (not granted) on connect', async () => {
       vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([], 'PENDING') as never,
       );
       await handle(request('connect', ['', '', 'sign_event:1,nip44_decrypt']));
-      expect(connections.setPermissions).toHaveBeenCalledWith('conn-1', [
+      // Requested, not granted: recorded for operator approval, never applied directly.
+      expect(connections.requestPermissions).toHaveBeenCalledWith('conn-1', [
         { method: 'sign_event', kind: 1 },
         { method: 'nip44_decrypt', kind: undefined },
       ]);
+      expect(connections.setPermissions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pending permissions do not grant access', () => {
+    it('denies a capability that is only PENDING (allowed=false), even if requested on connect', async () => {
+      // A pending nip44_decrypt (operator has not approved it) must not authorize decryption.
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
+        makeConnection([{ method: 'nip44_decrypt', allowed: false }]) as never,
+      );
+      const res = await handle(request('nip44_decrypt', ['third-party-pubkey', 'ciphertext']));
+      expect(res.error).toBe('Permission denied for nip44_decrypt');
+      expect(nip44Decrypt).not.toHaveBeenCalled();
+    });
+
+    it('allows the same capability once it has been approved (allowed=true)', async () => {
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
+        makeConnection([{ method: 'nip44_decrypt', allowed: true }]) as never,
+      );
+      const res = await handle(request('nip44_decrypt', ['third-party-pubkey', 'ciphertext']));
+      expect(res.error).toBeUndefined();
+      expect(nip44Decrypt).toHaveBeenCalledTimes(1);
     });
   });
 

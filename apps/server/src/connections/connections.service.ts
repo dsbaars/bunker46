@@ -74,6 +74,7 @@ export class ConnectionsService {
         connectionId: conn.id,
         method: p.method,
         kind: p.kind ?? null,
+        allowed: true,
       })),
     });
 
@@ -117,22 +118,94 @@ export class ConnectionsService {
     });
   }
 
+  /**
+   * Replace the connection's GRANTED permission set (operator-authoritative). Granted rows
+   * (`allowed = true`) are what the signer actually enforces, as a whitelist under the default-deny
+   * RPC handler. Pending requests (`allowed = false`) are PRESERVED, so editing the whitelist never
+   * silently discards a client's outstanding permission request.
+   */
   async setPermissions(connectionId: string, permissions: PermissionDescriptor[]) {
-    await this.prisma.connectionPermission.deleteMany({ where: { connectionId } });
+    await this.prisma.connectionPermission.deleteMany({ where: { connectionId, allowed: true } });
     if (permissions.length > 0) {
+      // Drop any pending row that is now being granted, to satisfy the (connectionId, method, kind)
+      // unique constraint before inserting the granted rows.
+      await this.prisma.connectionPermission.deleteMany({
+        where: {
+          connectionId,
+          allowed: false,
+          OR: permissions.map((p) => ({ method: p.method, kind: p.kind ?? null })),
+        },
+      });
       await this.prisma.connectionPermission.createMany({
         data: permissions.map((p) => ({
           connectionId,
           method: p.method,
           kind: p.kind ?? null,
+          allowed: true,
         })),
       });
     }
   }
 
+  /**
+   * Record permissions a client requested on `connect` as PENDING (`allowed = false`) for the operator
+   * to approve. Pending rows do NOT grant anything (the handler enforces only `allowed = true`), so a
+   * client can never self-escalate. Rows that already exist (granted or pending) for the same
+   * method/kind are skipped, so this never downgrades a granted permission and is idempotent.
+   */
+  async requestPermissions(connectionId: string, permissions: PermissionDescriptor[]) {
+    if (permissions.length === 0) return;
+    await this.prisma.connectionPermission.createMany({
+      data: permissions.map((p) => ({
+        connectionId,
+        method: p.method,
+        kind: p.kind ?? null,
+        allowed: false,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  /** Operator approves pending permission requests (all, or a given subset), turning them into grants. */
+  async approveRequests(
+    connectionId: string,
+    userId: string,
+    permissions?: PermissionDescriptor[],
+  ) {
+    const conn = await this.prisma.bunkerConnection.findUnique({ where: { id: connectionId } });
+    if (!conn || conn.userId !== userId) throw new NotFoundException();
+    await this.prisma.connectionPermission.updateMany({
+      where: {
+        connectionId,
+        allowed: false,
+        ...(permissions?.length
+          ? { OR: permissions.map((p) => ({ method: p.method, kind: p.kind ?? null })) }
+          : {}),
+      },
+      data: { allowed: true },
+    });
+    await this.eventsService.publishUserActivity(userId);
+  }
+
+  /** Operator denies (deletes) pending permission requests (all, or a given subset). */
+  async denyRequests(connectionId: string, userId: string, permissions?: PermissionDescriptor[]) {
+    const conn = await this.prisma.bunkerConnection.findUnique({ where: { id: connectionId } });
+    if (!conn || conn.userId !== userId) throw new NotFoundException();
+    await this.prisma.connectionPermission.deleteMany({
+      where: {
+        connectionId,
+        allowed: false,
+        ...(permissions?.length
+          ? { OR: permissions.map((p) => ({ method: p.method, kind: p.kind ?? null })) }
+          : {}),
+      },
+    });
+    await this.eventsService.publishUserActivity(userId);
+  }
+
   async getPermissions(connectionId: string): Promise<PermissionDescriptor[]> {
     const perms = await this.prisma.connectionPermission.findMany({
-      where: { connectionId },
+      where: { connectionId, allowed: true },
     });
     return perms.map((p) => ({
       method: p.method as PermissionDescriptor['method'],

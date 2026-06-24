@@ -248,8 +248,15 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  async ensureListeningForConnection(nsecKeyId: string, connectionRelays: string[]) {
-    const key = await this.prisma.nsecKey.findUnique({ where: { id: nsecKeyId } });
+  async ensureListeningForConnection(
+    nsecKeyId: string,
+    userId: string,
+    connectionRelays: string[],
+  ) {
+    // Defense-in-depth (same class as the C1 fix): scope the key lookup to its owner so this method
+    // can never start a listener that decrypts with another user's key, even if a future caller forgets
+    // to validate ownership first.
+    const key = await this.prisma.nsecKey.findFirst({ where: { id: nsecKeyId, userId } });
     if (!key) return;
 
     const nsecHex = this.encryption.decrypt(key.encryptedNsec);
@@ -365,11 +372,14 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
 
   async sendConnectResponse(
     nsecKeyId: string,
+    userId: string,
     clientPubkey: string,
     secret: string,
     relays: string[],
   ) {
-    const key = await this.prisma.nsecKey.findUnique({ where: { id: nsecKeyId } });
+    // Defense-in-depth (same class as the C1 fix): scope the key lookup to its owner so this method can
+    // never sign/publish a NIP-46 response with another user's key.
+    const key = await this.prisma.nsecKey.findFirst({ where: { id: nsecKeyId, userId } });
     if (!key) {
       this.logger.error('sendConnectResponse: nsec key not found');
       return;

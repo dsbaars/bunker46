@@ -183,7 +183,7 @@ This tool implements the full [NIP-46 Nostr Remote Signing](https://nips.nostr.c
 
 - **URI Support**: Parse and generate both `bunker://` and `nostrconnect://` URIs
 - **All RPC Methods**: `connect`, `sign_event`, `ping`, `get_public_key`, `nip04_encrypt/decrypt`, `nip44_encrypt/decrypt`, `switch_relays`
-- **Fine-grained Permissions**: Per-connection method and event kind restrictions
+- **Fine-grained Permissions**: Per-connection method and event-kind restrictions, enforced default-deny (a connection with no permissions can sign/decrypt nothing). New connections get a conservative default set (common signing kinds, no decryption). Following the NIP-46 model for a non-interactive signer, a connecting client may declare the scope it needs in its `connect` request and that becomes the connection's permission set, so **only connect clients you trust with the bound key**; operators can tighten any connection's permissions in the dashboard at any time.
 - **NIP-44 Encryption**: All communication encrypted using NIP-44
 - **Auth Challenges**: Support for out-of-band authentication
 - **Relay Management**: Configurable relays per connection with automatic reconnection

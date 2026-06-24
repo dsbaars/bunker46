@@ -136,12 +136,14 @@ export class ConnectionsController {
 
     await this.bunkerService.ensureListeningForConnection(
       body.nsecKeyId,
+      req.user.sub,
       validatedRelays ?? body.relays ?? [],
     );
 
     if (body.type === 'nostrconnect' && body.secret) {
       await this.bunkerService.sendConnectResponse(
         body.nsecKeyId,
+        req.user.sub,
         body.clientPubkey,
         body.secret,
         validatedRelays ?? body.relays ?? [],
@@ -160,6 +162,30 @@ export class ConnectionsController {
   ) {
     await this.connectionsService.getConnection(id, req.user.sub);
     await this.connectionsService.setPermissions(id, body.permissions);
+    return { success: true };
+  }
+
+  // Approve client-requested (pending) permissions; omit `permissions` to approve all pending.
+  @Post(':id/permissions/approve')
+  @HttpCode(HttpStatus.OK)
+  async approvePermissionRequests(
+    @Req() req: AuthReq,
+    @Param('id') id: string,
+    @Body() body: { permissions?: PermissionDescriptor[] },
+  ) {
+    await this.connectionsService.approveRequests(id, req.user.sub, body?.permissions);
+    return { success: true };
+  }
+
+  // Deny (delete) client-requested (pending) permissions; omit `permissions` to deny all pending.
+  @Post(':id/permissions/deny')
+  @HttpCode(HttpStatus.OK)
+  async denyPermissionRequests(
+    @Req() req: AuthReq,
+    @Param('id') id: string,
+    @Body() body: { permissions?: PermissionDescriptor[] },
+  ) {
+    await this.connectionsService.denyRequests(id, req.user.sub, body?.permissions);
     return { success: true };
   }
 

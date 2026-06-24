@@ -73,10 +73,15 @@ export class BunkerRpcHandler {
       return { id: request.id, error: 'Connection revoked' };
     }
 
-    const permissions: PermissionDescriptor[] = connection.permissions.map((p) => ({
-      method: p.method as PermissionDescriptor['method'],
-      kind: p.kind ?? undefined,
-    }));
+    // Only GRANTED permissions (allowed = true) are enforced. Pending requests (allowed = false),
+    // recorded when a client asks for capabilities on connect, grant nothing until the operator
+    // approves them in the dashboard — so a client can never self-escalate.
+    const permissions: PermissionDescriptor[] = connection.permissions
+      .filter((p) => p.allowed)
+      .map((p) => ({
+        method: p.method as PermissionDescriptor['method'],
+        kind: p.kind ?? undefined,
+      }));
 
     const nsecHex = this.encryption.decrypt(connection.nsecKey.encryptedNsec);
 
@@ -94,14 +99,19 @@ export class BunkerRpcHandler {
             );
           }
 
+          // Per NIP-46 a client may declare the capabilities it needs in the connect request's perms
+          // param. These are a REQUEST, not a grant: we record them as PENDING for the operator to
+          // approve in the dashboard (interactive approval). They grant nothing until approved, so a
+          // client can never self-escalate — only the seeded/operator-granted permissions are enforced.
+          // Already-granted (or already-pending) method/kinds are skipped, so re-connects are idempotent.
           const connectPerms = request.params[2];
           if (connectPerms) {
             try {
               const parsed = parsePermissionList(connectPerms);
               if (parsed.length > 0) {
-                await this.connections.setPermissions(connection.id, parsed);
+                await this.connections.requestPermissions(connection.id, parsed);
                 this.logger.log(
-                  `Stored ${parsed.length} permissions from connect for ${clientPubkey.slice(0, 12)}...: ${connectPerms}`,
+                  `Recorded ${parsed.length} pending permission request(s) from connect for ${clientPubkey.slice(0, 12)}...: ${connectPerms}`,
                 );
               }
             } catch {
