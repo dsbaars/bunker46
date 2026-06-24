@@ -4,9 +4,12 @@ import type { Page } from '@playwright/test';
 export const DEFAULT_PASSWORD = 'TestPassword1!';
 
 /**
- * Clear auth state (localStorage + localforage IndexedDB) so the app sees the user as logged out.
+ * Clear auth state so the app sees the user as logged out. The session now lives in an httpOnly
+ * refresh cookie, so clearing cookies is what actually ends the session; localStorage/IndexedDB are
+ * cleared too for any residual non-auth state.
  */
 export async function clearAuthStorage(page: Page) {
+  await page.context().clearCookies();
   await page.evaluate(() => {
     localStorage.clear();
     return new Promise<void>((resolve) => {

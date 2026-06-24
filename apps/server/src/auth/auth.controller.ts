@@ -28,16 +28,25 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 /** httpOnly cookie that carries the refresh token; never exposed to browser JavaScript. */
 const REFRESH_COOKIE = 'refresh_token';
 
-function refreshCookieOptions() {
-  const days = parseInt(process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7') || 7;
+/**
+ * Cookie attributes shared by set and clear. Browsers only delete a cookie when the clear call's
+ * attributes match those it was set with, so both paths must use the same values.
+ */
+function refreshCookieAttrs() {
   return {
     httpOnly: true,
     secure: process.env['NODE_ENV'] === 'production',
     sameSite: 'lax' as const,
     // Scope to the auth routes that consume it (refresh, logout), so it is not sent on every request.
     path: '/api/auth',
-    maxAge: days * 24 * 60 * 60,
   };
+}
+
+function refreshCookieOptions() {
+  // Keep in sync with AuthService's refresh-token expiry — both derive days from
+  // JWT_REFRESH_EXPIRES_IN (default 7d) so the cookie lifetime matches the DB session expiry.
+  const days = parseInt(process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d') || 7;
+  return { ...refreshCookieAttrs(), maxAge: days * 24 * 60 * 60 };
 }
 
 function sessionContextFromRequest(req: FastifyRequest): {
@@ -86,7 +95,7 @@ export class AuthController {
   }
 
   private clearRefreshCookie(reply: FastifyReply): void {
-    reply.clearCookie(REFRESH_COOKIE, { path: '/api/auth' });
+    reply.clearCookie(REFRESH_COOKIE, refreshCookieAttrs());
   }
 
   @Get('config')

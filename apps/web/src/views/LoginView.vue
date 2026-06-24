@@ -77,7 +77,7 @@ async function handleLogin() {
       await settings.load(accessToken);
       router.push('/dashboard');
     } catch {
-      auth.logout();
+      await auth.logout();
       error.value = 'Session could not be verified. Please try again.';
     }
   } catch (err) {
@@ -126,7 +126,7 @@ async function handlePasskeyLogin() {
         await settings.load(accessToken);
         router.push('/dashboard');
       } catch {
-        auth.logout();
+        await auth.logout();
         passkeyError.value = 'Session could not be verified. Please try again.';
       }
       return;

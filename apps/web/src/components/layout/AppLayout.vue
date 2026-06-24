@@ -43,8 +43,10 @@ const navItems = [
   { name: 'Settings', path: '/settings/general', icon: SlidersHorizontal },
 ];
 
-function handleLogout() {
-  auth.logout();
+async function handleLogout() {
+  // Await so the server-side revoke + httpOnly cookie clear complete before we navigate; otherwise a
+  // fast reload could re-authenticate via the still-present cookie.
+  await auth.logout();
   settingsStore.clear();
   router.push('/login');
 }

@@ -10,13 +10,23 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 describe('AuthController', () => {
   const mockAuthService = {
     register: vi.fn().mockResolvedValue({ accessToken: 'at', refreshToken: 'rt', user: {} }),
+    login: vi
+      .fn()
+      .mockResolvedValue({ accessToken: 'at', refreshToken: 'rt', requiresTotp: false }),
+    loginWithPasskey: vi
+      .fn()
+      .mockResolvedValue({ accessToken: 'at', refreshToken: 'rt', requiresTotp: false }),
     refreshTokens: vi
       .fn()
       .mockResolvedValue({ accessToken: 'at2', refreshToken: 'rt2', requiresTotp: false }),
     logout: vi.fn().mockResolvedValue(undefined),
   };
   const mockTotpService = {};
-  const mockPasskeyService = {};
+  const mockPasskeyService = {
+    verifyAuthentication: vi
+      .fn()
+      .mockResolvedValue({ verification: { verified: true }, userId: 'user-1' }),
+  };
   const mockUsersService = {
     count: vi.fn().mockResolvedValue(1),
   };
@@ -219,8 +229,54 @@ describe('AuthController', () => {
       const req = { headers: {}, cookies: { refresh_token: 'rt-x' } } as unknown as FastifyRequest;
       const result = await controller.logout(req, mockReply);
       expect(mockAuthService.logout).toHaveBeenCalledWith('rt-x');
-      expect(mockReply.clearCookie).toHaveBeenCalledWith('refresh_token', { path: '/api/auth' });
+      // Clear must carry the same attributes it was set with, or some browsers keep the cookie.
+      expect(mockReply.clearCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        expect.objectContaining({ path: '/api/auth', httpOnly: true, sameSite: 'lax' }),
+      );
       expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('issueSession on other token-minting endpoints', () => {
+    const mockReply = { setCookie: vi.fn(), clearCookie: vi.fn() } as unknown as FastifyReply;
+    const req = { ip: '127.0.0.1', headers: {} } as unknown as FastifyRequest;
+
+    beforeEach(() => vi.mocked(mockReply.setCookie).mockClear());
+
+    it('login sets the refresh cookie and strips the token from the body', async () => {
+      const result = await controller.login(req, mockReply, {
+        username: 'someuser',
+        password: 'TestPassword1!',
+      });
+      expect(mockReply.setCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'rt',
+        expect.objectContaining({ httpOnly: true, sameSite: 'lax', path: '/api/auth' }),
+      );
+      expect(result).not.toHaveProperty('refreshToken');
+      expect(result).toHaveProperty('accessToken', 'at');
+    });
+
+    it('passkey login sets the cookie on success and strips the token', async () => {
+      const result = await controller.passkeyLoginVerify(req, mockReply, {
+        response: {} as never,
+      });
+      expect(mockReply.setCookie).toHaveBeenCalledWith('refresh_token', 'rt', expect.any(Object));
+      expect(result).not.toHaveProperty('refreshToken');
+      expect(result).toMatchObject({ verified: true, accessToken: 'at' });
+    });
+
+    it('passkey login sets no cookie when verification fails', async () => {
+      mockPasskeyService.verifyAuthentication.mockResolvedValueOnce({
+        verification: { verified: false },
+        userId: '',
+      });
+      const result = await controller.passkeyLoginVerify(req, mockReply, {
+        response: {} as never,
+      });
+      expect(mockReply.setCookie).not.toHaveBeenCalled();
+      expect(result).toEqual({ verified: false });
     });
   });
 });
