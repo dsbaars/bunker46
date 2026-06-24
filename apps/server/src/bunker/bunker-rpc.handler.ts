@@ -88,6 +88,9 @@ export class BunkerRpcHandler {
     let result: string | undefined;
     let error: string | undefined;
     let eventKind: number | undefined;
+    // A gated method denied for want of permission is captured here and, after the request is
+    // handled, recorded as a PENDING permission request the operator can approve in the dashboard.
+    let deniedPermission: PermissionDescriptor | undefined;
 
     try {
       switch (request.method) {
@@ -151,6 +154,7 @@ export class BunkerRpcHandler {
           // of them — unlike the previous fail-open behaviour where an empty set allowed everything.
           if (!checkPermission(permissions, { method: 'sign_event', kind: eventKind })) {
             error = `Permission denied for sign_event kind:${eventKind}`;
+            deniedPermission = { method: 'sign_event', kind: eventKind };
             break;
           }
 
@@ -161,6 +165,7 @@ export class BunkerRpcHandler {
         case 'nip04_encrypt': {
           if (!checkPermission(permissions, { method: 'nip04_encrypt' })) {
             error = 'Permission denied for nip04_encrypt';
+            deniedPermission = { method: 'nip04_encrypt' };
             break;
           }
           const [tp04e, pt04] = request.params;
@@ -175,6 +180,7 @@ export class BunkerRpcHandler {
         case 'nip04_decrypt': {
           if (!checkPermission(permissions, { method: 'nip04_decrypt' })) {
             error = 'Permission denied for nip04_decrypt';
+            deniedPermission = { method: 'nip04_decrypt' };
             break;
           }
           const [tp04d, ct04] = request.params;
@@ -189,6 +195,7 @@ export class BunkerRpcHandler {
         case 'nip44_encrypt': {
           if (!checkPermission(permissions, { method: 'nip44_encrypt' })) {
             error = 'Permission denied for nip44_encrypt';
+            deniedPermission = { method: 'nip44_encrypt' };
             break;
           }
           const [tp44e, pt44] = request.params;
@@ -203,6 +210,7 @@ export class BunkerRpcHandler {
         case 'nip44_decrypt': {
           if (!checkPermission(permissions, { method: 'nip44_decrypt' })) {
             error = 'Permission denied for nip44_decrypt';
+            deniedPermission = { method: 'nip44_decrypt' };
             break;
           }
           const [tp44d, ct44] = request.params;
@@ -229,6 +237,18 @@ export class BunkerRpcHandler {
 
     const durationMs = Date.now() - start;
     await this.connections.touchActivity(connection.id);
+
+    // Surface a denied gated request as a PENDING permission request (allowed = false) so the operator
+    // can approve it in the dashboard — the interactive approval flow extended to capabilities the
+    // client exercises at runtime, not just those it declared on connect. Recorded with skipDuplicates,
+    // so a client retrying the same method/kind cannot spam the queue, and it never downgrades a grant.
+    if (deniedPermission) {
+      try {
+        await this.connections.requestPermissions(connection.id, [deniedPermission]);
+      } catch (err) {
+        this.logger.warn(`Failed to record pending permission request: ${err}`);
+      }
+    }
 
     await this.loggingService.logSigningAction({
       connectionId: connection.id,

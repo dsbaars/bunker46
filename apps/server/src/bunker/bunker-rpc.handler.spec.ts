@@ -240,6 +240,36 @@ describe('BunkerRpcHandler', () => {
     });
   });
 
+  describe('denied gated requests surface as pending', () => {
+    it('records a denied sign_event kind as a PENDING permission request for operator approval', async () => {
+      // Granted only kind 1; the client signs kind 30078 (app data) which is not permitted.
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
+        makeConnection([{ method: 'sign_event', kind: 1 }]) as never,
+      );
+      const res = await handle(request('sign_event', [signEventJson(30078)]));
+      expect(res.error).toBe('Permission denied for sign_event kind:30078');
+      expect(connections.requestPermissions).toHaveBeenCalledWith('conn-1', [
+        { method: 'sign_event', kind: 30078 },
+      ]);
+    });
+
+    it('records a denied nip44_decrypt as a PENDING (method-level) request', async () => {
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(makeConnection([]) as never);
+      await handle(request('nip44_decrypt', ['third-party-pubkey', 'ciphertext']));
+      expect(connections.requestPermissions).toHaveBeenCalledWith('conn-1', [
+        { method: 'nip44_decrypt' },
+      ]);
+    });
+
+    it('does NOT record a pending request when the capability is already permitted', async () => {
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
+        makeConnection([{ method: 'sign_event', kind: 1 }]) as never,
+      );
+      await handle(request('sign_event', [signEventJson(1)]));
+      expect(connections.requestPermissions).not.toHaveBeenCalled();
+    });
+  });
+
   describe('audit logging', () => {
     it('logs an approved signing action and publishes activity', async () => {
       vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(

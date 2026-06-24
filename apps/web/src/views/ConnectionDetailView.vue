@@ -63,8 +63,11 @@ function permLabel(p: Perm) {
   return p.kind != null ? `${p.method}:${p.kind}` : p.method;
 }
 
-function isMethodGranted(method: string) {
-  return grantedPerms.value.some((p) => p.method === method);
+// A method-level grant (no kind) authorizes every kind for that method. The toggle reflects ONLY this
+// all-kinds state — a connection that has just kind-scoped grants (e.g. sign_event:1) shows the toggle
+// OFF, so the control never overstates what is allowed. The specific kinds appear as chips above.
+function isMethodAllKinds(method: string) {
+  return grantedPerms.value.some((p) => p.method === method && p.kind == null);
 }
 
 const wirePerm = (p: Perm) => ({ method: p.method, ...(p.kind != null ? { kind: p.kind } : {}) });
@@ -81,12 +84,33 @@ async function setGranted(perms: Perm[]) {
   await reloadConnection();
 }
 
-async function grantMethod(method: string) {
-  await setGranted([...grantedPerms.value, { method }]);
+// Grant a method for ALL kinds: replace any kind-scoped grants for this method with a single
+// method-level (kindless) grant, which the signer treats as "any kind".
+async function grantAllKinds(method: string) {
+  await setGranted([...grantedPerms.value.filter((p) => p.method !== method), { method }]);
 }
 
+// Remove every grant for this method (both the all-kinds row and any kind-scoped rows).
 async function revokeMethod(method: string) {
   await setGranted(grantedPerms.value.filter((p) => p.method !== method));
+}
+
+const newKind = ref('');
+
+// Grant a single specific event kind (e.g. sign_event:30078) typed by the operator. No-op on an
+// invalid number or a kind that is already granted (either specifically or via an all-kinds grant).
+async function grantKind(method: string, kindStr: string) {
+  const kind = Number.parseInt(kindStr, 10);
+  if (!Number.isInteger(kind) || kind < 0) return;
+  const alreadyGranted = grantedPerms.value.some(
+    (p) => p.method === method && (p.kind == null || p.kind === kind),
+  );
+  if (alreadyGranted) {
+    newKind.value = '';
+    return;
+  }
+  await setGranted([...grantedPerms.value, { method, kind }]);
+  newKind.value = '';
 }
 
 async function revokePerm(perm: Perm) {
@@ -369,9 +393,10 @@ function formatTime(ts: string) {
           switch_relays.
         </p>
 
-        <!-- Quick toggle for the gated capability methods (method-level, all kinds) -->
+        <!-- Quick toggle for the gated capability methods. The toggle grants the method for ALL kinds
+             (method-level); per-kind grants for sign_event are added via the input below. -->
         <div class="space-y-1">
-          <p class="text-xs text-muted-foreground mb-1">Capability methods</p>
+          <p class="text-xs text-muted-foreground mb-1">Allow all kinds</p>
           <div
             v-for="method in GATED_METHODS"
             :key="method"
@@ -381,16 +406,40 @@ function formatTime(ts: string) {
             <button
               :class="[
                 'w-12 h-6 rounded-full transition-colors cursor-pointer relative',
-                isMethodGranted(method) ? 'bg-primary' : 'bg-muted',
+                isMethodAllKinds(method) ? 'bg-primary' : 'bg-muted',
               ]"
-              @click="isMethodGranted(method) ? revokeMethod(method) : grantMethod(method)"
+              :title="isMethodAllKinds(method) ? 'Revoke (all kinds)' : 'Allow all kinds'"
+              @click="isMethodAllKinds(method) ? revokeMethod(method) : grantAllKinds(method)"
             >
               <span
                 :class="[
                   'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform',
-                  isMethodGranted(method) ? 'left-6' : 'left-0.5',
+                  isMethodAllKinds(method) ? 'left-6' : 'left-0.5',
                 ]"
               />
+            </button>
+          </div>
+        </div>
+
+        <!-- Grant a single specific sign_event kind (e.g. 30078 for app data) without allowing all kinds. -->
+        <div class="mt-4 pt-3 border-t border-border/50">
+          <p class="text-xs text-muted-foreground mb-2">Allow a specific sign_event kind</p>
+          <div class="flex items-center gap-2">
+            <input
+              v-model="newKind"
+              type="number"
+              min="0"
+              inputmode="numeric"
+              placeholder="kind, e.g. 30078"
+              class="flex-1 h-9 rounded-md border border-border bg-background px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+              @keyup.enter="grantKind('sign_event', newKind)"
+            />
+            <button
+              class="h-9 px-3 rounded-md bg-primary/10 text-primary text-sm hover:bg-primary/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="!newKind"
+              @click="grantKind('sign_event', newKind)"
+            >
+              Add kind
             </button>
           </div>
         </div>
