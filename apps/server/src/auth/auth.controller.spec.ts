@@ -257,6 +257,40 @@ describe('AuthController', () => {
       await expect(controller.refresh(req, mockReply)).rejects.toThrow('Missing refresh token');
       expect(mockAuthService.refreshTokens).not.toHaveBeenCalled();
     });
+
+    // The Secure flag governs whether a plain-HTTP (e.g. LAN) deployment can keep a session across
+    // reloads: a Secure cookie is dropped over http, so the reload-restore via /api/auth/refresh fails.
+    describe('Secure cookie flag', () => {
+      const req = {
+        headers: {},
+        cookies: { refresh_token: 'rt-from-cookie' },
+      } as unknown as FastifyRequest;
+      const original = process.env['COOKIE_SECURE'];
+      afterEach(() => {
+        if (original === undefined) delete process.env['COOKIE_SECURE'];
+        else process.env['COOKIE_SECURE'] = original;
+      });
+
+      it('marks the cookie Secure=false when COOKIE_SECURE=false (plain-HTTP deployment)', async () => {
+        process.env['COOKIE_SECURE'] = 'false';
+        await controller.refresh(req, mockReply);
+        expect(mockReply.setCookie).toHaveBeenCalledWith(
+          'refresh_token',
+          'rt2',
+          expect.objectContaining({ secure: false }),
+        );
+      });
+
+      it('marks the cookie Secure=true when COOKIE_SECURE=true', async () => {
+        process.env['COOKIE_SECURE'] = 'true';
+        await controller.refresh(req, mockReply);
+        expect(mockReply.setCookie).toHaveBeenCalledWith(
+          'refresh_token',
+          'rt2',
+          expect.objectContaining({ secure: true }),
+        );
+      });
+    });
   });
 
   describe('logout', () => {
