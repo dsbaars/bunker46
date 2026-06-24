@@ -1,7 +1,6 @@
 {
   "extends": "@bunker46/tsconfig/vue.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

@@ -1,12 +1,18 @@
 {
   "extends": "@bunker46/tsconfig/node.json",
   "compilerOptions": {
+    // SWC handles JS emit (flat into dist/); tsc is type-check only.
+    // noEmit avoids TS6's TS5011 (which would demand an explicit rootDir), and
+    // leaving rootDir unset keeps the Nest SWC builder's `stripLeadingPaths` true
+    // (it derives it from `!rootDir`) so output lands in dist/* not dist/src/*.
+    // baseUrl is still required so SWC can rewrite the "@/*" path aliases.
+    "noEmit": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]

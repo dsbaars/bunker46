@@ -47,7 +47,10 @@ export class PasskeyService {
     return options;
   }
 
-  async verifyRegistration(userId: string, response: RegistrationResponseJSON) {
+  async verifyRegistration(
+    userId: string,
+    response: RegistrationResponseJSON,
+  ): Promise<Awaited<ReturnType<typeof verifyRegistrationResponse>>> {
     const expectedChallenge = this.challenges.get(userId);
     if (!expectedChallenge) throw new Error('No challenge found');
 
