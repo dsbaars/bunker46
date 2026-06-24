@@ -44,6 +44,12 @@ export class ConnectionsService {
       secret?: string;
       remotePubkey?: string;
     },
+    /**
+     * Operator-chosen permission seed (granted). When the operator picks permissions while generating
+     * a bunker:// URI, those are the authoritative grants for the auto-created connection. Omitted (or
+     * empty) falls back to DEFAULT_CONNECTION_PERMISSIONS so a connection is never left fail-open.
+     */
+    seedPermissions?: PermissionDescriptor[],
   ) {
     // Authorization (C1): bind a connection only to an nsec key the caller actually owns. Without
     // this, an authenticated user could create a connection referencing another user's nsecKeyId and
@@ -66,11 +72,16 @@ export class ConnectionsService {
       },
     });
 
-    // Seed a conservative default permission set so the connection is usable under the default-deny
-    // RPC handler without being fail-open. Callers with an explicit permission list (controller
-    // body.perms / the connect request's perms param) overwrite these via setPermissions afterwards.
+    // Seed the connection's granted permissions so it is usable under the default-deny RPC handler
+    // without being fail-open. Prefer the operator's explicit choice (e.g. picked while generating the
+    // bunker:// URI); otherwise fall back to a conservative default set. Callers with an explicit list
+    // (controller body.perms / the connect request's perms param) can still adjust these afterwards.
+    const seed =
+      seedPermissions && seedPermissions.length > 0
+        ? seedPermissions
+        : DEFAULT_CONNECTION_PERMISSIONS;
     await this.prisma.connectionPermission.createMany({
-      data: DEFAULT_CONNECTION_PERMISSIONS.map((p) => ({
+      data: seed.map((p) => ({
         connectionId: conn.id,
         method: p.method,
         kind: p.kind ?? null,

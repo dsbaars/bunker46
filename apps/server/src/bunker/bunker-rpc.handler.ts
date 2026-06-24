@@ -11,6 +11,14 @@ import {
   type Nip46Response,
 } from '@bunker46/shared-types';
 
+/** Resolved pending bunker:// secret: who/which key to bind, plus the operator's chosen permission seed. */
+type PendingSecretResult = {
+  userId: string;
+  nsecKeyId: string;
+  name: string;
+  permissions?: PermissionDescriptor[];
+};
+
 @Injectable()
 export class BunkerRpcHandler {
   private readonly logger = new Logger(BunkerRpcHandler.name);
@@ -18,7 +26,7 @@ export class BunkerRpcHandler {
   private pendingSecretLookup?: (
     signerPubkey: string,
     secret: string,
-  ) => { userId: string; nsecKeyId: string; name: string } | undefined;
+  ) => PendingSecretResult | undefined;
 
   constructor(
     private readonly connections: ConnectionsService,
@@ -28,10 +36,7 @@ export class BunkerRpcHandler {
   ) {}
 
   setPendingSecretLookup(
-    fn: (
-      signerPubkey: string,
-      secret: string,
-    ) => { userId: string; nsecKeyId: string; name: string } | undefined,
+    fn: (signerPubkey: string, secret: string) => PendingSecretResult | undefined,
   ) {
     this.pendingSecretLookup = fn;
   }
@@ -298,11 +303,17 @@ export class BunkerRpcHandler {
     );
 
     try {
-      await this.connections.createConnection(info.userId, info.nsecKeyId, clientPubkey, {
-        name: info.name,
-        relays: [],
-        secret,
-      });
+      await this.connections.createConnection(
+        info.userId,
+        info.nsecKeyId,
+        clientPubkey,
+        {
+          name: info.name,
+          relays: [],
+          secret,
+        },
+        info.permissions,
+      );
 
       return this.connections.findByClientAndSigner(clientPubkey, signerPubkey);
     } catch (err) {

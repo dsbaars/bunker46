@@ -123,6 +123,46 @@ describe('ConnectionsService', () => {
       expect(eventsService.publishUserActivity).toHaveBeenCalledWith('user-1');
     });
 
+    it('seeds the operator-chosen permissions (granted) instead of the defaults when provided', async () => {
+      vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue({
+        id: 'key-1',
+        userId: 'user-1',
+      } as never);
+
+      // Operator picked these while generating the bunker:// URI (operator-authoritative seed).
+      await service.createConnection('user-1', 'key-1', 'client-pub', { name: 'App' }, [
+        { method: 'sign_event', kind: 30078 },
+        { method: 'nip44_decrypt' },
+      ]);
+
+      const seedArg = vi.mocked(prisma.connectionPermission!.createMany!).mock.calls[0]?.[0] as {
+        data: Array<{
+          connectionId: string;
+          method: string;
+          kind: number | null;
+          allowed: boolean;
+        }>;
+      };
+      expect(seedArg.data).toEqual([
+        { connectionId: 'conn-1', method: 'sign_event', kind: 30078, allowed: true },
+        { connectionId: 'conn-1', method: 'nip44_decrypt', kind: null, allowed: true },
+      ]);
+    });
+
+    it('falls back to the default seed when the operator-chosen list is empty', async () => {
+      vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue({
+        id: 'key-1',
+        userId: 'user-1',
+      } as never);
+
+      await service.createConnection('user-1', 'key-1', 'client-pub', { name: 'App' }, []);
+
+      const seedArg = vi.mocked(prisma.connectionPermission!.createMany!).mock.calls[0]?.[0] as {
+        data: Array<{ method: string; kind: number | null }>;
+      };
+      expect(seedArg.data.map((p) => p.kind)).toEqual(expect.arrayContaining([0, 1, 3, 4, 7]));
+    });
+
     it('should throw NotFoundException when the nsec key does not belong to the user (C1)', async () => {
       // findFirst scoped by { id, userId } returns null for a foreign or non-existent key.
       vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue(null as never);

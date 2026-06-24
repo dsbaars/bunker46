@@ -63,6 +63,23 @@ describe('BunkerService', () => {
       const result = service.consumePendingSecret('a'.repeat(64), 'unknown');
       expect(result).toBeUndefined();
     });
+
+    it('preserves the operator-chosen permission seed through register/consume', () => {
+      const pubkey = 'b'.repeat(64);
+      const secret = 'secret-with-perms';
+      const info = {
+        userId: 'u1',
+        nsecKeyId: 'k1',
+        name: 'Test',
+        permissions: [
+          { method: 'sign_event' as const, kind: 30078 },
+          { method: 'nip44_decrypt' as const },
+        ],
+      };
+      service.registerPendingSecret(pubkey, secret, info);
+      // The connect handler reads these back to seed the auto-created connection's granted permissions.
+      expect(service.consumePendingSecret(pubkey, secret)).toEqual(info);
+    });
   });
 
   describe('listeners', () => {

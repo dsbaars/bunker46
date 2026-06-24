@@ -11,7 +11,11 @@ import { hexToBytes } from '@noble/hashes/utils.js';
 import * as nip44 from 'nostr-tools/nip44';
 import * as nip04 from 'nostr-tools/nip04';
 import { BunkerRpcHandler } from './bunker-rpc.handler.js';
-import { Nip46RequestSchema, SafeRelayUrlSchema } from '@bunker46/shared-types';
+import {
+  Nip46RequestSchema,
+  SafeRelayUrlSchema,
+  type PermissionDescriptor,
+} from '@bunker46/shared-types';
 import { NOSTR_CONSTANTS, NOSTR_DEFAULT_RELAYS_INJECTION_TOKEN } from '@bunker46/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
@@ -32,6 +36,8 @@ export interface PendingSecretInfo {
   userId: string;
   nsecKeyId: string;
   name: string;
+  /** Operator-chosen granted permissions to seed the auto-created connection with (bunker:// flow). */
+  permissions?: PermissionDescriptor[];
 }
 
 @Injectable()
