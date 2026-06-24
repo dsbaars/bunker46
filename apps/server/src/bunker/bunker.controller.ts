@@ -9,7 +9,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { SafeRelayUrlsSchema } from '@bunker46/shared-types';
+import { SafeRelayUrlsSchema, PermissionDescriptorSchema } from '@bunker46/shared-types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { TotpVerifiedGuard } from '../auth/guards/totp-verified.guard.js';
 import { BunkerService } from './bunker.service.js';
@@ -48,11 +48,19 @@ export class BunkerController {
   }
 
   @Post('generate-bunker-uri')
-  async generateBunkerUri(@Req() req: AuthReq, @Body() body: { nsecKeyId: string; name?: string }) {
+  async generateBunkerUri(
+    @Req() req: AuthReq,
+    @Body() body: { nsecKeyId: string; name?: string; permissions?: unknown },
+  ) {
     const key = await this.prisma.nsecKey.findUnique({ where: { id: body.nsecKeyId } });
     if (!key || key.userId !== req.user.sub) {
       throw new Error('Key not found');
     }
+
+    // Operator-chosen permission seed (default-deny, operator-authoritative). Validated and deduped;
+    // an absent/empty/invalid list leaves the connection to fall back to the conservative defaults.
+    const parsedPerms = PermissionDescriptorSchema.array().safeParse(body.permissions);
+    const permissions = parsedPerms.success ? parsedPerms.data : undefined;
 
     const relays = await this.getActiveRelaysForUser(req.user.sub);
     const secret = randomBytes(16).toString('hex');
@@ -61,9 +69,10 @@ export class BunkerController {
       userId: req.user.sub,
       nsecKeyId: body.nsecKeyId,
       name: body.name || 'Bunker46',
+      permissions,
     });
 
-    await this.bunkerService.ensureListeningForConnection(body.nsecKeyId, relays);
+    await this.bunkerService.ensureListeningForConnection(body.nsecKeyId, req.user.sub, relays);
 
     const uri = this.uriService.buildBunkerUri(key.publicKey, relays, secret);
     return { uri, secret, signerPubkey: key.publicKey, relays };

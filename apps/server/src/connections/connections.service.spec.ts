@@ -17,12 +17,16 @@ describe('ConnectionsService', () => {
         create: vi.fn().mockResolvedValue({ id: 'key-1', publicKey: 'pub', label: 'My Key' }),
         findMany: vi.fn().mockResolvedValue([]),
         findUnique: vi.fn().mockResolvedValue(null),
+        findFirst: vi.fn().mockResolvedValue(null),
         delete: vi.fn().mockResolvedValue(undefined),
       },
       bunkerConnection: {
         create: vi.fn().mockResolvedValue({ id: 'conn-1', status: 'PENDING' }),
         findMany: vi.fn().mockResolvedValue([]),
         findUnique: vi.fn().mockResolvedValue(null),
+        findUniqueOrThrow: vi
+          .fn()
+          .mockResolvedValue({ id: 'conn-1', status: 'PENDING', permissions: [] }),
         findFirst: vi.fn().mockResolvedValue(null),
         update: vi.fn().mockResolvedValue({}),
         delete: vi.fn().mockResolvedValue(undefined),
@@ -31,6 +35,7 @@ describe('ConnectionsService', () => {
       connectionPermission: {
         deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
         createMany: vi.fn().mockResolvedValue({ count: 0 }),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
         findMany: vi.fn().mockResolvedValue([]),
       },
     };
@@ -84,8 +89,18 @@ describe('ConnectionsService', () => {
   });
 
   describe('createConnection', () => {
-    it('should create connection and publish activity', async () => {
+    it('should create connection, seed default permissions and publish activity', async () => {
+      vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue({
+        id: 'key-1',
+        userId: 'user-1',
+      } as never);
+
       await service.createConnection('user-1', 'key-1', 'client-pub', { name: 'App' });
+
+      // C1: ownership of the nsec key is verified, scoped by the authenticated userId.
+      expect(prisma.nsecKey?.findFirst).toHaveBeenCalledWith({
+        where: { id: 'key-1', userId: 'user-1' },
+      });
       expect(prisma.bunkerConnection?.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -97,7 +112,68 @@ describe('ConnectionsService', () => {
           }),
         }),
       );
+      // H2: a conservative default permission set is seeded so the connection is not fail-open.
+      const seedArg = vi.mocked(prisma.connectionPermission!.createMany!).mock.calls[0]?.[0] as {
+        data: Array<{ connectionId: string; method: string; kind: number | null }>;
+      };
+      expect(seedArg.data.length).toBeGreaterThan(0);
+      expect(seedArg.data.every((p) => p.connectionId === 'conn-1')).toBe(true);
+      expect(seedArg.data.every((p) => p.method === 'sign_event')).toBe(true);
+      expect(seedArg.data.map((p) => p.kind)).toEqual(expect.arrayContaining([0, 1, 3, 4, 7]));
       expect(eventsService.publishUserActivity).toHaveBeenCalledWith('user-1');
+    });
+
+    it('seeds the operator-chosen permissions (granted) instead of the defaults when provided', async () => {
+      vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue({
+        id: 'key-1',
+        userId: 'user-1',
+      } as never);
+
+      // Operator picked these while generating the bunker:// URI (operator-authoritative seed).
+      await service.createConnection('user-1', 'key-1', 'client-pub', { name: 'App' }, [
+        { method: 'sign_event', kind: 30078 },
+        { method: 'nip44_decrypt' },
+      ]);
+
+      const seedArg = vi.mocked(prisma.connectionPermission!.createMany!).mock.calls[0]?.[0] as {
+        data: Array<{
+          connectionId: string;
+          method: string;
+          kind: number | null;
+          allowed: boolean;
+        }>;
+      };
+      expect(seedArg.data).toEqual([
+        { connectionId: 'conn-1', method: 'sign_event', kind: 30078, allowed: true },
+        { connectionId: 'conn-1', method: 'nip44_decrypt', kind: null, allowed: true },
+      ]);
+    });
+
+    it('falls back to the default seed when the operator-chosen list is empty', async () => {
+      vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue({
+        id: 'key-1',
+        userId: 'user-1',
+      } as never);
+
+      await service.createConnection('user-1', 'key-1', 'client-pub', { name: 'App' }, []);
+
+      const seedArg = vi.mocked(prisma.connectionPermission!.createMany!).mock.calls[0]?.[0] as {
+        data: Array<{ method: string; kind: number | null }>;
+      };
+      expect(seedArg.data.map((p) => p.kind)).toEqual(expect.arrayContaining([0, 1, 3, 4, 7]));
+    });
+
+    it('should throw NotFoundException when the nsec key does not belong to the user (C1)', async () => {
+      // findFirst scoped by { id, userId } returns null for a foreign or non-existent key.
+      vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue(null as never);
+
+      await expect(
+        service.createConnection('attacker', 'victim-key', 'client-pub', { name: 'Evil' }),
+      ).rejects.toThrow(NotFoundException);
+
+      // The connection is never created and no key is bound.
+      expect(prisma.bunkerConnection?.create).not.toHaveBeenCalled();
+      expect(prisma.connectionPermission?.createMany).not.toHaveBeenCalled();
     });
   });
 
@@ -176,19 +252,113 @@ describe('ConnectionsService', () => {
   });
 
   describe('setPermissions', () => {
-    it('should delete existing and create new permissions', async () => {
+    it('replaces granted permissions while preserving pending requests', async () => {
       await service.setPermissions('conn-1', [
         { method: 'sign_event', kind: 1 },
         { method: 'ping' },
       ]);
+      // Only granted rows are cleared; pending rows survive.
       expect(prisma.connectionPermission?.deleteMany).toHaveBeenCalledWith({
-        where: { connectionId: 'conn-1' },
+        where: { connectionId: 'conn-1', allowed: true },
+      });
+      // Pending rows for the now-granted method/kinds are dropped to avoid a unique conflict.
+      expect(prisma.connectionPermission?.deleteMany).toHaveBeenCalledWith({
+        where: {
+          connectionId: 'conn-1',
+          allowed: false,
+          OR: [
+            { method: 'sign_event', kind: 1 },
+            { method: 'ping', kind: null },
+          ],
+        },
       });
       expect(prisma.connectionPermission?.createMany).toHaveBeenCalledWith({
         data: [
-          { connectionId: 'conn-1', method: 'sign_event', kind: 1 },
-          { connectionId: 'conn-1', method: 'ping', kind: null },
+          { connectionId: 'conn-1', method: 'sign_event', kind: 1, allowed: true },
+          { connectionId: 'conn-1', method: 'ping', kind: null, allowed: true },
         ],
+      });
+    });
+  });
+
+  describe('requestPermissions', () => {
+    it('records requested permissions as PENDING (allowed=false), skipping duplicates', async () => {
+      await service.requestPermissions('conn-1', [
+        { method: 'sign_event', kind: 1 },
+        { method: 'nip44_decrypt' },
+      ]);
+      expect(prisma.connectionPermission?.createMany).toHaveBeenCalledWith({
+        data: [
+          { connectionId: 'conn-1', method: 'sign_event', kind: 1, allowed: false },
+          { connectionId: 'conn-1', method: 'nip44_decrypt', kind: null, allowed: false },
+        ],
+        skipDuplicates: true,
+      });
+    });
+
+    it('is a no-op for an empty request', async () => {
+      await service.requestPermissions('conn-1', []);
+      expect(prisma.connectionPermission?.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('approveRequests', () => {
+    it('throws when the connection does not belong to the user', async () => {
+      vi.mocked(prisma.bunkerConnection!.findUnique!).mockResolvedValue({
+        id: 'conn-1',
+        userId: 'other',
+      } as never);
+      await expect(service.approveRequests('conn-1', 'user-1')).rejects.toThrow(NotFoundException);
+      expect(prisma.connectionPermission?.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('approves all pending requests by flipping allowed to true', async () => {
+      vi.mocked(prisma.bunkerConnection!.findUnique!).mockResolvedValue({
+        id: 'conn-1',
+        userId: 'user-1',
+      } as never);
+      await service.approveRequests('conn-1', 'user-1');
+      expect(prisma.connectionPermission?.updateMany).toHaveBeenCalledWith({
+        where: { connectionId: 'conn-1', allowed: false },
+        data: { allowed: true },
+      });
+    });
+
+    it('approves only the given subset when provided', async () => {
+      vi.mocked(prisma.bunkerConnection!.findUnique!).mockResolvedValue({
+        id: 'conn-1',
+        userId: 'user-1',
+      } as never);
+      await service.approveRequests('conn-1', 'user-1', [{ method: 'nip44_decrypt' }]);
+      expect(prisma.connectionPermission?.updateMany).toHaveBeenCalledWith({
+        where: {
+          connectionId: 'conn-1',
+          allowed: false,
+          OR: [{ method: 'nip44_decrypt', kind: null }],
+        },
+        data: { allowed: true },
+      });
+    });
+  });
+
+  describe('denyRequests', () => {
+    it('throws when the connection does not belong to the user', async () => {
+      vi.mocked(prisma.bunkerConnection!.findUnique!).mockResolvedValue({
+        id: 'conn-1',
+        userId: 'other',
+      } as never);
+      await expect(service.denyRequests('conn-1', 'user-1')).rejects.toThrow(NotFoundException);
+      expect(prisma.connectionPermission?.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('deletes pending requests for the owner', async () => {
+      vi.mocked(prisma.bunkerConnection!.findUnique!).mockResolvedValue({
+        id: 'conn-1',
+        userId: 'user-1',
+      } as never);
+      await service.denyRequests('conn-1', 'user-1');
+      expect(prisma.connectionPermission?.deleteMany).toHaveBeenCalledWith({
+        where: { connectionId: 'conn-1', allowed: false },
       });
     });
   });

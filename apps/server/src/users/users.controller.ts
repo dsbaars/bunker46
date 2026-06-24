@@ -31,10 +31,16 @@ export class UsersController {
   @Patch('me/password')
   @HttpCode(HttpStatus.OK)
   async changePassword(
-    @Req() req: FastifyRequest & { user: { sub: string } },
+    @Req() req: FastifyRequest & { user: { sub: string; sessionId?: string } },
     @Body() body: { currentPassword: string; newPassword: string },
   ) {
-    await this.usersService.updatePassword(req.user.sub, body.currentPassword, body.newPassword);
+    // Pass the current session id so it is kept while all other sessions are revoked (H1).
+    await this.usersService.updatePassword(
+      req.user.sub,
+      body.currentPassword,
+      body.newPassword,
+      req.user.sessionId,
+    );
     return { success: true };
   }
 

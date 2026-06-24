@@ -11,6 +11,14 @@ import {
   type Nip46Response,
 } from '@bunker46/shared-types';
 
+/** Resolved pending bunker:// secret: who/which key to bind, plus the operator's chosen permission seed. */
+type PendingSecretResult = {
+  userId: string;
+  nsecKeyId: string;
+  name: string;
+  permissions?: PermissionDescriptor[];
+};
+
 @Injectable()
 export class BunkerRpcHandler {
   private readonly logger = new Logger(BunkerRpcHandler.name);
@@ -18,7 +26,7 @@ export class BunkerRpcHandler {
   private pendingSecretLookup?: (
     signerPubkey: string,
     secret: string,
-  ) => { userId: string; nsecKeyId: string; name: string } | undefined;
+  ) => PendingSecretResult | undefined;
 
   constructor(
     private readonly connections: ConnectionsService,
@@ -28,10 +36,7 @@ export class BunkerRpcHandler {
   ) {}
 
   setPendingSecretLookup(
-    fn: (
-      signerPubkey: string,
-      secret: string,
-    ) => { userId: string; nsecKeyId: string; name: string } | undefined,
+    fn: (signerPubkey: string, secret: string) => PendingSecretResult | undefined,
   ) {
     this.pendingSecretLookup = fn;
   }
@@ -56,7 +61,7 @@ export class BunkerRpcHandler {
     getPublicKeyFromNsec: (nsecHex: string) => string,
   ): Promise<Nip46Response> {
     const start = Date.now();
-    let connection = await this.connections.findByClientPubkey(clientPubkey);
+    let connection = await this.connections.findByClientAndSigner(clientPubkey, signerPubkey);
 
     if (!connection && request.method === 'connect') {
       connection = await this.handleNewConnect(clientPubkey, signerPubkey, request);
@@ -73,16 +78,24 @@ export class BunkerRpcHandler {
       return { id: request.id, error: 'Connection revoked' };
     }
 
-    const permissions: PermissionDescriptor[] = connection.permissions.map((p) => ({
-      method: p.method as PermissionDescriptor['method'],
-      kind: p.kind ?? undefined,
-    }));
+    // Only GRANTED permissions (allowed = true) are enforced. Pending requests (allowed = false),
+    // recorded when a client asks for capabilities on connect, grant nothing until the operator
+    // approves them in the dashboard — so a client can never self-escalate.
+    const permissions: PermissionDescriptor[] = connection.permissions
+      .filter((p) => p.allowed)
+      .map((p) => ({
+        method: p.method as PermissionDescriptor['method'],
+        kind: p.kind ?? undefined,
+      }));
 
     const nsecHex = this.encryption.decrypt(connection.nsecKey.encryptedNsec);
 
     let result: string | undefined;
     let error: string | undefined;
     let eventKind: number | undefined;
+    // A gated method denied for want of permission is captured here and, after the request is
+    // handled, recorded as a PENDING permission request the operator can approve in the dashboard.
+    let deniedPermission: PermissionDescriptor | undefined;
 
     try {
       switch (request.method) {
@@ -94,14 +107,19 @@ export class BunkerRpcHandler {
             );
           }
 
+          // Per NIP-46 a client may declare the capabilities it needs in the connect request's perms
+          // param. These are a REQUEST, not a grant: we record them as PENDING for the operator to
+          // approve in the dashboard (interactive approval). They grant nothing until approved, so a
+          // client can never self-escalate — only the seeded/operator-granted permissions are enforced.
+          // Already-granted (or already-pending) method/kinds are skipped, so re-connects are idempotent.
           const connectPerms = request.params[2];
           if (connectPerms) {
             try {
               const parsed = parsePermissionList(connectPerms);
               if (parsed.length > 0) {
-                await this.connections.setPermissions(connection.id, parsed);
+                await this.connections.requestPermissions(connection.id, parsed);
                 this.logger.log(
-                  `Stored ${parsed.length} permissions from connect for ${clientPubkey.slice(0, 12)}...: ${connectPerms}`,
+                  `Recorded ${parsed.length} pending permission request(s) from connect for ${clientPubkey.slice(0, 12)}...: ${connectPerms}`,
                 );
               }
             } catch {
@@ -136,11 +154,12 @@ export class BunkerRpcHandler {
             `sign_event kind:${eventKind} from ${clientPubkey.slice(0, 12)}... (conn: ${connection.name})`,
           );
 
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'sign_event', kind: eventKind })
-          ) {
+          // Default-deny: every capability method (sign_event, nip04/nip44 encrypt/decrypt) requires
+          // an explicit matching permission. A connection with no stored permissions can perform none
+          // of them — unlike the previous fail-open behaviour where an empty set allowed everything.
+          if (!checkPermission(permissions, { method: 'sign_event', kind: eventKind })) {
             error = `Permission denied for sign_event kind:${eventKind}`;
+            deniedPermission = { method: 'sign_event', kind: eventKind };
             break;
           }
 
@@ -149,11 +168,9 @@ export class BunkerRpcHandler {
         }
 
         case 'nip04_encrypt': {
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'nip04_encrypt' })
-          ) {
+          if (!checkPermission(permissions, { method: 'nip04_encrypt' })) {
             error = 'Permission denied for nip04_encrypt';
+            deniedPermission = { method: 'nip04_encrypt' };
             break;
           }
           const [tp04e, pt04] = request.params;
@@ -166,11 +183,9 @@ export class BunkerRpcHandler {
         }
 
         case 'nip04_decrypt': {
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'nip04_decrypt' })
-          ) {
+          if (!checkPermission(permissions, { method: 'nip04_decrypt' })) {
             error = 'Permission denied for nip04_decrypt';
+            deniedPermission = { method: 'nip04_decrypt' };
             break;
           }
           const [tp04d, ct04] = request.params;
@@ -183,11 +198,9 @@ export class BunkerRpcHandler {
         }
 
         case 'nip44_encrypt': {
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'nip44_encrypt' })
-          ) {
+          if (!checkPermission(permissions, { method: 'nip44_encrypt' })) {
             error = 'Permission denied for nip44_encrypt';
+            deniedPermission = { method: 'nip44_encrypt' };
             break;
           }
           const [tp44e, pt44] = request.params;
@@ -200,11 +213,9 @@ export class BunkerRpcHandler {
         }
 
         case 'nip44_decrypt': {
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'nip44_decrypt' })
-          ) {
+          if (!checkPermission(permissions, { method: 'nip44_decrypt' })) {
             error = 'Permission denied for nip44_decrypt';
+            deniedPermission = { method: 'nip44_decrypt' };
             break;
           }
           const [tp44d, ct44] = request.params;
@@ -231,6 +242,18 @@ export class BunkerRpcHandler {
 
     const durationMs = Date.now() - start;
     await this.connections.touchActivity(connection.id);
+
+    // Surface a denied gated request as a PENDING permission request (allowed = false) so the operator
+    // can approve it in the dashboard — the interactive approval flow extended to capabilities the
+    // client exercises at runtime, not just those it declared on connect. Recorded with skipDuplicates,
+    // so a client retrying the same method/kind cannot spam the queue, and it never downgrades a grant.
+    if (deniedPermission) {
+      try {
+        await this.connections.requestPermissions(connection.id, [deniedPermission]);
+      } catch (err) {
+        this.logger.warn(`Failed to record pending permission request: ${err}`);
+      }
+    }
 
     await this.loggingService.logSigningAction({
       connectionId: connection.id,
@@ -280,13 +303,19 @@ export class BunkerRpcHandler {
     );
 
     try {
-      await this.connections.createConnection(info.userId, info.nsecKeyId, clientPubkey, {
-        name: info.name,
-        relays: [],
-        secret,
-      });
+      await this.connections.createConnection(
+        info.userId,
+        info.nsecKeyId,
+        clientPubkey,
+        {
+          name: info.name,
+          relays: [],
+          secret,
+        },
+        info.permissions,
+      );
 
-      return this.connections.findByClientPubkey(clientPubkey);
+      return this.connections.findByClientAndSigner(clientPubkey, signerPubkey);
     } catch (err) {
       this.logger.error(`Failed to auto-create connection: ${err}`);
       return null;

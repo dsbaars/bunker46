@@ -42,6 +42,9 @@ describe('UsersService', () => {
         update: vi.fn().mockResolvedValue(mockUser),
         count: vi.fn().mockResolvedValue(0),
       },
+      session: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     // Run interactive transactions inline against the same mocked client.
     prisma.$transaction = vi.fn((cb: (tx: PrismaService) => unknown) =>
@@ -157,7 +160,7 @@ describe('UsersService', () => {
       );
     });
 
-    it('should update password when current is correct', async () => {
+    it('should update password and revoke all sessions when no session is kept', async () => {
       vi.mocked(prisma.user!.findUnique!).mockResolvedValue(mockUser);
       vi.mocked(prisma.user!.update!).mockResolvedValue({ ...mockUser, passwordHash: 'newhash' });
       await usersService.updatePassword('user-1', 'current', 'newpass');
@@ -165,6 +168,25 @@ describe('UsersService', () => {
         where: { id: 'user-1' },
         data: { passwordHash: 'hashed-password' },
       });
+      // H1: every session is invalidated on password change.
+      expect(prisma.session?.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } });
+    });
+
+    it('should keep the current session and revoke the others (H1)', async () => {
+      vi.mocked(prisma.user!.findUnique!).mockResolvedValue(mockUser);
+      await usersService.updatePassword('user-1', 'current', 'newpass', 'session-current');
+      expect(prisma.session?.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', id: { not: 'session-current' } },
+      });
+    });
+
+    it('should not revoke any session when the current password is wrong', async () => {
+      vi.mocked(prisma.user!.findUnique!).mockResolvedValue(mockUser);
+      vi.mocked(argon2.verify).mockResolvedValue(false);
+      await expect(usersService.updatePassword('user-1', 'wrong', 'newpass')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(prisma.session?.deleteMany).not.toHaveBeenCalled();
     });
   });
 

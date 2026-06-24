@@ -2,7 +2,7 @@
 import { ref, watch, onMounted, computed } from 'vue';
 import { useActivityStream } from '@/composables/useActivityStream';
 import { useRouter, useRoute } from 'vue-router';
-import { Link2, KeyRound, Plug, Lock, Unlock, Search } from '@lucide/vue';
+import { Link2, KeyRound, Plug, Lock, Search } from '@lucide/vue';
 import { api } from '@/lib/api';
 import { useUiStore } from '@/stores/ui';
 import { useFormatting } from '@/composables/useFormatting';
@@ -17,6 +17,9 @@ const route = useRoute();
 const ui = useUiStore();
 const { formatDateTime } = useFormatting();
 
+const grantedCount = (c: Connection) => c.permissions.filter((p) => p.allowed).length;
+const pendingCount = (c: Connection) => c.permissions.filter((p) => !p.allowed).length;
+
 interface Connection {
   id: string;
   name: string;
@@ -28,7 +31,7 @@ interface Connection {
   lastActivity?: string;
   createdAt: string;
   nsecKey: { publicKey: string; label: string };
-  permissions: Array<{ method: string; kind?: number }>;
+  permissions: Array<{ method: string; kind?: number; allowed?: boolean }>;
   _count: { logs: number };
 }
 
@@ -83,6 +86,61 @@ const generatedUriQr = ref('');
 const generating = ref(false);
 const copied = ref(false);
 const error = ref('');
+
+// Operator-chosen permission seed for the bunker:// flow. Since the operator generates the URI, they
+// are authoritative: these become the connection's GRANTED permissions on connect (default-deny). The
+// signer gates these methods; connect/ping/get_public_key/switch_relays are always available.
+type PickPerm = { method: string; kind?: number };
+const GATED_METHODS = [
+  'sign_event',
+  'nip04_encrypt',
+  'nip04_decrypt',
+  'nip44_encrypt',
+  'nip44_decrypt',
+];
+const DEFAULT_SEED: PickPerm[] = [
+  { method: 'sign_event', kind: 0 },
+  { method: 'sign_event', kind: 1 },
+  { method: 'sign_event', kind: 3 },
+  { method: 'sign_event', kind: 4 },
+  { method: 'sign_event', kind: 7 },
+];
+const seedPerms = ref<PickPerm[]>([...DEFAULT_SEED]);
+const newSeedKind = ref('');
+
+const permLabel = (p: PickPerm) => (p.kind != null ? `${p.method}:${p.kind}` : p.method);
+const isSeedAllKinds = (method: string) =>
+  seedPerms.value.some((p) => p.method === method && p.kind == null);
+
+function toggleSeedMethod(method: string) {
+  // Toggle a method-level (all-kinds) grant. Granting all kinds replaces any kind-scoped rows for it.
+  seedPerms.value = isSeedAllKinds(method)
+    ? seedPerms.value.filter((p) => p.method !== method)
+    : [...seedPerms.value.filter((p) => p.method !== method), { method }];
+}
+
+function removeSeedPerm(p: PickPerm) {
+  seedPerms.value = seedPerms.value.filter((x) => permLabel(x) !== permLabel(p));
+}
+
+// Grant every gated method for all kinds, or clear the whole selection.
+const allMethodsAllKinds = computed(() => GATED_METHODS.every((m) => isSeedAllKinds(m)));
+function grantAllSeed() {
+  seedPerms.value = GATED_METHODS.map((method) => ({ method }));
+}
+function revokeAllSeed() {
+  seedPerms.value = [];
+}
+
+function addSeedKind() {
+  const kind = Number.parseInt(newSeedKind.value, 10);
+  if (!Number.isInteger(kind) || kind < 0) return;
+  const exists = seedPerms.value.some(
+    (p) => p.method === 'sign_event' && (p.kind == null || p.kind === kind),
+  );
+  if (!exists) seedPerms.value = [...seedPerms.value, { method: 'sign_event', kind }];
+  newSeedKind.value = '';
+}
 
 const bunkerUri = ref('');
 const uriPreviewImage = ref('');
@@ -177,6 +235,8 @@ function reset() {
   bunkerUri.value = '';
   uriPreviewImage.value = '';
   creating.value = false;
+  seedPerms.value = [...DEFAULT_SEED];
+  newSeedKind.value = '';
 }
 
 function enterMode(m: 'generate' | 'import') {
@@ -199,6 +259,7 @@ async function generateBunkerUri() {
     const res = await api.post<{ uri: string }>('/bunker/generate-bunker-uri', {
       nsecKeyId: selectedKeyId.value,
       name: connectionName.value || undefined,
+      permissions: seedPerms.value,
     });
     generatedUri.value = res.uri;
   } catch (err) {
@@ -312,6 +373,102 @@ function statusVariant(status: string) {
           <label class="text-sm font-medium mb-1.5 block">Connection Name (optional)</label>
           <Input v-model="connectionName" placeholder="e.g. Primal, Coracle..." />
         </div>
+
+        <!-- Operator-chosen permissions, granted on connect (default-deny). -->
+        <div>
+          <label class="text-sm font-medium mb-1.5 block">Permissions</label>
+          <p class="text-xs text-muted-foreground mb-2">
+            Granted to this connection on connect. Anything the client later needs beyond these is
+            denied and shows up as a request you can approve. connect, ping, get_public_key and
+            switch_relays are always available.
+          </p>
+
+          <div v-if="seedPerms.length" class="flex flex-wrap gap-2 mb-3">
+            <span
+              v-for="perm in seedPerms"
+              :key="permLabel(perm)"
+              class="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded bg-primary/10 text-primary"
+            >
+              {{ permLabel(perm) }}
+              <button
+                class="hover:text-destructive cursor-pointer"
+                title="Remove"
+                @click="removeSeedPerm(perm)"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+          <p v-else class="text-xs text-muted-foreground mb-3">
+            No permissions selected — the connection starts able to do nothing until you grant some.
+          </p>
+
+          <div class="rounded-lg border border-border divide-y divide-border/50">
+            <!-- Master toggle: grant every gated method (all kinds) at once, or clear all. -->
+            <div class="flex items-center justify-between px-3 py-2 bg-muted/30">
+              <span class="text-sm font-medium">All permissions</span>
+              <button
+                type="button"
+                :class="[
+                  'w-12 h-6 rounded-full transition-colors cursor-pointer relative',
+                  allMethodsAllKinds ? 'bg-primary' : 'bg-muted',
+                ]"
+                :title="allMethodsAllKinds ? 'Clear all' : 'Grant all (all kinds)'"
+                @click="allMethodsAllKinds ? revokeAllSeed() : grantAllSeed()"
+              >
+                <span
+                  :class="[
+                    'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform',
+                    allMethodsAllKinds ? 'left-6' : 'left-0.5',
+                  ]"
+                />
+              </button>
+            </div>
+            <div
+              v-for="method in GATED_METHODS"
+              :key="method"
+              class="flex items-center justify-between px-3 py-2"
+            >
+              <span class="text-sm font-mono">
+                {{ method }}
+                <span v-if="method === 'sign_event'" class="text-xs text-muted-foreground ml-1"
+                  >all kinds</span
+                >
+              </span>
+              <button
+                type="button"
+                :class="[
+                  'w-12 h-6 rounded-full transition-colors cursor-pointer relative',
+                  isSeedAllKinds(method) ? 'bg-primary' : 'bg-muted',
+                ]"
+                :title="isSeedAllKinds(method) ? 'Remove (all kinds)' : 'Allow all kinds'"
+                @click="toggleSeedMethod(method)"
+              >
+                <span
+                  :class="[
+                    'absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform',
+                    isSeedAllKinds(method) ? 'left-6' : 'left-0.5',
+                  ]"
+                />
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 mt-3">
+            <Input
+              v-model="newSeedKind"
+              type="number"
+              min="0"
+              placeholder="sign_event kind, e.g. 30078"
+              class="flex-1 font-mono text-sm"
+              @keyup.enter="addSeedKind"
+            />
+            <Button variant="ghost" :disabled="!newSeedKind" @click="addSeedKind">
+              Add kind
+            </Button>
+          </div>
+        </div>
+
         <p v-if="nsecKeys.length === 0" class="text-sm text-muted-foreground">
           <router-link to="/keys" class="text-primary hover:underline">
             Add an nsec key
@@ -512,21 +669,15 @@ function statusVariant(status: string) {
               /></span>
             </p>
             <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+              <span class="flex items-center gap-1">
+                <Lock class="w-3.5 h-3.5 shrink-0" />
+                {{ grantedCount(conn) }} granted
+              </span>
               <span
-                class="flex items-center gap-1"
-                :class="
-                  conn.permissions.length === 0
-                    ? 'text-amber-600 dark:text-amber-400 font-medium'
-                    : ''
-                "
+                v-if="pendingCount(conn) > 0"
+                class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium"
               >
-                <Unlock v-if="conn.permissions.length === 0" class="w-3.5 h-3.5 shrink-0" />
-                <Lock v-else class="w-3.5 h-3.5 shrink-0" />
-                {{
-                  conn.permissions.length === 0
-                    ? 'Unrestricted'
-                    : `${conn.permissions.length} permissions`
-                }}
+                {{ pendingCount(conn) }} pending
               </span>
               <span>{{ conn._count.logs }} logs</span>
               <span v-if="conn.lastActivity"> Last: {{ formatDateTime(conn.lastActivity) }} </span>
