@@ -234,6 +234,9 @@ export class BunkerRpcHandler {
 
     await this.loggingService.logSigningAction({
       connectionId: connection.id,
+      userId: connection.userId,
+      connectionName: connection.name,
+      clientPubkey: connection.clientPubkey,
       method: request.method,
       eventKind,
       result: error ? 'ERROR' : 'APPROVED',

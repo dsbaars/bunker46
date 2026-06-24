@@ -65,8 +65,10 @@ export interface BunkerConnectionDto {
 
 export interface SigningLogEntryDto {
   id: string;
-  connectionId: string;
+  // null once the originating connection has been deleted (the log is retained for audit).
+  connectionId: string | null;
   connectionName: string;
+  clientPubkey: string;
   method: Nip46Method;
   eventKind?: number;
   result: 'approved' | 'denied' | 'error';
