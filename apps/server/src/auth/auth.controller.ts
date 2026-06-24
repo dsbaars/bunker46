@@ -21,6 +21,7 @@ import { TotpService } from './totp.service.js';
 import { PasskeyService } from './passkey.service.js';
 import { UsersService } from '../users/users.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
+import { TotpVerifiedGuard } from './guards/totp-verified.guard.js';
 import type { FastifyRequest } from 'fastify';
 
 function sessionContextFromRequest(req: FastifyRequest): {
@@ -112,9 +113,13 @@ export class AuthController {
     );
   }
 
+  // The ONLY authenticated endpoint that intentionally accepts a pre-TOTP partial token: it is the
+  // step that completes the second factor. Every other authenticated route below adds
+  // TotpVerifiedGuard so a partial token cannot read or mutate account/2FA state.
   @Post('totp/verify')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   async verifyTotp(
     @Req() req: FastifyRequest & { user: { sub: string } },
@@ -124,7 +129,7 @@ export class AuthController {
   }
 
   @Post('totp/setup')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   async setupTotp(@Req() req: FastifyRequest & { user: { sub: string; username: string } }) {
     const secret = this.totpService.generateSecret();
@@ -134,7 +139,7 @@ export class AuthController {
   }
 
   @Post('totp/enable')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async enableTotp(
@@ -154,7 +159,7 @@ export class AuthController {
   }
 
   @Delete('totp')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async disableTotp(@Req() req: FastifyRequest & { user: { sub: string } }) {
@@ -177,14 +182,14 @@ export class AuthController {
   }
 
   @Get('sessions')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   async listSessions(@Req() req: FastifyRequest & { user: { sub: string; sessionId?: string } }) {
     return this.authService.listSessions(req.user.sub, req.user.sessionId);
   }
 
   @Delete('sessions/others')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async revokeAllOtherSessions(
@@ -195,7 +200,7 @@ export class AuthController {
   }
 
   @Delete('sessions/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async revokeSession(
@@ -207,7 +212,7 @@ export class AuthController {
   }
 
   @Get('passkey/register/options')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   async passkeyRegisterOptions(
     @Req() req: FastifyRequest & { user: { sub: string; username: string } },
@@ -216,7 +221,7 @@ export class AuthController {
   }
 
   @Post('passkey/register/verify')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async passkeyRegisterVerify(
@@ -253,14 +258,14 @@ export class AuthController {
   }
 
   @Get('passkey')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   async listPasskeys(@Req() req: FastifyRequest & { user: { sub: string } }) {
     return this.passkeyService.listPasskeys(req.user.sub);
   }
 
   @Delete('passkey/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TotpVerifiedGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async deletePasskey(

@@ -20,11 +20,19 @@ export class EventsController {
     if (!token) {
       throw new UnauthorizedException('Missing access token');
     }
-    let payload: { sub: string };
+    let payload: { sub: string; totpEnabled?: boolean; totpVerified?: boolean };
     try {
-      payload = (await this.jwtService.verifyAsync(token)) as { sub: string };
+      payload = (await this.jwtService.verifyAsync(token)) as {
+        sub: string;
+        totpEnabled?: boolean;
+        totpVerified?: boolean;
+      };
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
+    }
+    // Reject pre-TOTP partial tokens, mirroring TotpVerifiedGuard on the rest of the API.
+    if (payload.totpEnabled === true && payload.totpVerified === false) {
+      throw new UnauthorizedException('TOTP verification required');
     }
     const userId = payload.sub;
     if (!this.eventsService.isAvailable()) {

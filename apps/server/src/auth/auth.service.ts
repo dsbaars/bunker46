@@ -38,6 +38,11 @@ export class AuthService {
     sessionContext?: { ipAddress?: string; userAgent?: string },
   ) {
     const user = await this.usersService.findById(userId);
+    // A passkey is a phishing-resistant possession+verification factor, so a successful passkey
+    // login is treated as fully authenticated (totpVerified=true) and does NOT additionally require
+    // a TOTP code, even when the account also has TOTP enabled. Passkey *registration* requires a
+    // fully-authenticated session (TotpVerifiedGuard on /auth/passkey/register/*), so a pre-TOTP
+    // partial token cannot enrol a passkey to sidestep the second factor.
     return this.createTokens(
       user.id,
       user.username,

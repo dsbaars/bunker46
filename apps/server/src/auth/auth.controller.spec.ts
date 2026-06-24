@@ -1,11 +1,19 @@
+import 'reflect-metadata';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
 import { AuthController } from './auth.controller.js';
+import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
+import { TotpVerifiedGuard } from './guards/totp-verified.guard.js';
 import type { AuthService } from './auth.service.js';
 import type { TotpService } from './totp.service.js';
 import type { PasskeyService } from './passkey.service.js';
 import type { UsersService } from '../users/users.service.js';
 import type { FastifyRequest } from 'fastify';
+
+/** Read the guards declared by @UseGuards on a controller method. */
+function methodGuards(method: (...args: never[]) => unknown): unknown[] {
+  return (Reflect.getMetadata('__guards__', method) as unknown[]) ?? [];
+}
 
 describe('AuthController', () => {
   const mockAuthService = {
@@ -155,6 +163,35 @@ describe('AuthController', () => {
       delete process.env['ALLOW_REGISTRATION'];
       await controller.register(mockReq, validBody);
       expect(mockAuthService.register).toHaveBeenCalled();
+    });
+  });
+
+  // Regression guard: a pre-TOTP partial token must not reach account/2FA-mutation endpoints.
+  // This catches a new authenticated endpoint being added without TotpVerifiedGuard.
+  describe('full-auth guard coverage', () => {
+    const proto = AuthController.prototype;
+
+    it.each([
+      ['disableTotp'],
+      ['setupTotp'],
+      ['enableTotp'],
+      ['listSessions'],
+      ['revokeSession'],
+      ['revokeAllOtherSessions'],
+      ['passkeyRegisterOptions'],
+      ['passkeyRegisterVerify'],
+      ['listPasskeys'],
+      ['deletePasskey'],
+    ])('requires JwtAuthGuard + TotpVerifiedGuard on %s', (name) => {
+      const guards = methodGuards((proto as Record<string, never>)[name]);
+      expect(guards).toContain(JwtAuthGuard);
+      expect(guards).toContain(TotpVerifiedGuard);
+    });
+
+    it('keeps totp/verify open to a partial token (JwtAuthGuard only)', () => {
+      const guards = methodGuards(proto.verifyTotp);
+      expect(guards).toContain(JwtAuthGuard);
+      expect(guards).not.toContain(TotpVerifiedGuard);
     });
   });
 });

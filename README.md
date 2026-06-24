@@ -139,13 +139,41 @@ pnpm lint:security
 
 ### Production (Docker)
 
+`docker-compose.yml` is the production example. It is **secure by default**: it has no fallback
+secrets and does not publish the database/Redis ports to the host, so it will refuse to start until
+you provide strong secrets.
+
 ```bash
-# Build and run all services
+# 1. Generate strong secrets and write them to a .env next to docker-compose.yml
+cat > .env <<EOF
+JWT_SECRET=$(openssl rand -base64 48)
+JWT_REFRESH_SECRET=$(openssl rand -base64 48)
+ENCRYPTION_KEY=$(openssl rand -base64 48)
+# Set these to your real public origin:
+CORS_ORIGINS=https://bunker.example.com
+WEBAUTHN_RP_ID=bunker.example.com
+WEBAUTHN_ORIGIN=https://bunker.example.com
+EOF
+
+# 2. Build and run all services
 docker compose up --build
 
-# Access the application
+# 3. Access the application (front it with TLS via your reverse proxy)
 open http://localhost:8080
 ```
+
+> ⚠️ `ENCRYPTION_KEY` protects the stored Nostr private keys. If you lose or change it, existing
+> encrypted keys can no longer be decrypted. Back it up and rotate deliberately.
+
+**Production deployment checklist:**
+
+- [ ] Strong, unique `JWT_SECRET`, `JWT_REFRESH_SECRET`, `ENCRYPTION_KEY` (not the dev placeholders — the server refuses to start with them when `NODE_ENV=production`)
+- [ ] TLS terminated by a reverse proxy (Caddy/Nginx); only the web/proxy entrypoint is exposed publicly
+- [ ] `TRUST_PROXY=true` set **only** when the app is reachable solely through that trusted proxy
+- [ ] `CORS_ORIGINS`, `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN` set to your real public origin
+- [ ] `ALLOW_REGISTRATION` left disabled (default) unless you intend open sign-ups; the first account can still be created on first run
+- [ ] Postgres/Redis not published to the host (default) — reachable only over the internal Docker network
+- [ ] Database backups and a tested restore procedure in place
 
 When running behind a reverse proxy (e.g. Caddy, Nginx), set `TRUST_PROXY=true` (or `1` / `yes`) in the server environment so that session IPs and throttling use the client IP from `X-Forwarded-For` / `X-Real-IP`. Only enable this when the app is only reachable through a trusted proxy.
 
