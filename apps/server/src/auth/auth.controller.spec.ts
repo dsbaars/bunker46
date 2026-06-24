@@ -13,7 +13,9 @@ describe('AuthController', () => {
   };
   const mockTotpService = {};
   const mockPasskeyService = {};
-  const mockUsersService = {};
+  const mockUsersService = {
+    count: vi.fn().mockResolvedValue(1),
+  };
 
   let controller: AuthController;
   let envBackup: string | undefined;
@@ -23,10 +25,15 @@ describe('AuthController', () => {
       mockAuthService as unknown as AuthService,
       mockTotpService as TotpService,
       mockPasskeyService as PasskeyService,
-      mockUsersService as UsersService,
+      mockUsersService as unknown as UsersService,
     );
     envBackup = process.env['ALLOW_REGISTRATION'];
     mockAuthService.register.mockClear();
+    // Default: at least one user already exists, so registration gating reflects
+    // only ALLOW_REGISTRATION. Tests that exercise the first-account bootstrap
+    // path override this to resolve 0.
+    mockUsersService.count.mockReset();
+    mockUsersService.count.mockResolvedValue(1);
   });
 
   afterEach(() => {
@@ -38,54 +45,63 @@ describe('AuthController', () => {
   });
 
   describe('getAuthConfig', () => {
-    it('returns registrationEnabled: true when ALLOW_REGISTRATION is unset', () => {
+    it('returns registrationEnabled: true when ALLOW_REGISTRATION is unset', async () => {
       delete process.env['ALLOW_REGISTRATION'];
-      expect(controller.getAuthConfig()).toEqual({
+      expect(await controller.getAuthConfig()).toEqual({
         registrationEnabled: true,
         loginNotice: null,
       });
     });
 
-    it('returns registrationEnabled: true when ALLOW_REGISTRATION is "true"', () => {
+    it('returns registrationEnabled: true when ALLOW_REGISTRATION is "true"', async () => {
       process.env['ALLOW_REGISTRATION'] = 'true';
-      expect(controller.getAuthConfig()).toEqual({
+      expect(await controller.getAuthConfig()).toEqual({
         registrationEnabled: true,
         loginNotice: null,
       });
     });
 
-    it('returns registrationEnabled: true for any value other than false/0', () => {
+    it('returns registrationEnabled: true for any value other than false/0', async () => {
       process.env['ALLOW_REGISTRATION'] = '1';
-      expect(controller.getAuthConfig()).toEqual({
+      expect(await controller.getAuthConfig()).toEqual({
         registrationEnabled: true,
         loginNotice: null,
       });
       process.env['ALLOW_REGISTRATION'] = 'yes';
-      expect(controller.getAuthConfig()).toEqual({
+      expect(await controller.getAuthConfig()).toEqual({
         registrationEnabled: true,
         loginNotice: null,
       });
     });
 
-    it('returns registrationEnabled: false when ALLOW_REGISTRATION is "false"', () => {
+    it('returns registrationEnabled: false when ALLOW_REGISTRATION is "false"', async () => {
       process.env['ALLOW_REGISTRATION'] = 'false';
-      expect(controller.getAuthConfig()).toEqual({
+      expect(await controller.getAuthConfig()).toEqual({
         registrationEnabled: false,
         loginNotice: null,
       });
     });
 
-    it('returns registrationEnabled: false when ALLOW_REGISTRATION is "0"', () => {
+    it('returns registrationEnabled: false when ALLOW_REGISTRATION is "0"', async () => {
       process.env['ALLOW_REGISTRATION'] = '0';
-      expect(controller.getAuthConfig()).toEqual({
+      expect(await controller.getAuthConfig()).toEqual({
         registrationEnabled: false,
         loginNotice: null,
       });
     });
 
-    it('returns loginNotice when LOGIN_NOTICE is set', () => {
+    it('returns registrationEnabled: true when registration is disabled but no users exist yet', async () => {
+      process.env['ALLOW_REGISTRATION'] = 'false';
+      mockUsersService.count.mockResolvedValue(0);
+      expect(await controller.getAuthConfig()).toEqual({
+        registrationEnabled: true,
+        loginNotice: null,
+      });
+    });
+
+    it('returns loginNotice when LOGIN_NOTICE is set', async () => {
       process.env['LOGIN_NOTICE'] = ' Testing server. Data may be deleted. ';
-      expect(controller.getAuthConfig()).toEqual({
+      expect(await controller.getAuthConfig()).toEqual({
         registrationEnabled: true,
         loginNotice: 'Testing server. Data may be deleted.',
       });
@@ -110,6 +126,17 @@ describe('AuthController', () => {
       process.env['ALLOW_REGISTRATION'] = '0';
       await expect(controller.register(mockReq, validBody)).rejects.toThrow(ForbiddenException);
       expect(mockAuthService.register).not.toHaveBeenCalled();
+    });
+
+    it('allows the first account when registration is disabled and no users exist', async () => {
+      process.env['ALLOW_REGISTRATION'] = 'false';
+      mockUsersService.count.mockResolvedValue(0);
+      await controller.register(mockReq, validBody);
+      expect(mockAuthService.register).toHaveBeenCalledWith(
+        'newuser',
+        'securepass8',
+        expect.any(Object),
+      );
     });
 
     it('calls authService.register when registration is allowed', async () => {
