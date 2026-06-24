@@ -61,7 +61,7 @@
     "@nestjs/testing": "^11.1.27",
     "@swc/cli": "^0.8.1",
     "@swc/core": "^1.15.43",
-    "@types/node": "^26.0.0",
+    "@types/node": "^24.13.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/qrcode": "^1.5.6",
     "@types/ws": "^8.18.1",
