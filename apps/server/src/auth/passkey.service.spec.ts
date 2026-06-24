@@ -33,6 +33,7 @@ describe('PasskeyService — usernameless challenge handling', () => {
   let service: PasskeyService;
   let prisma: {
     passkey: { findUnique: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+    user: { findUnique: ReturnType<typeof vi.fn> };
   };
 
   beforeEach(() => {
@@ -47,6 +48,12 @@ describe('PasskeyService — usernameless challenge handling', () => {
           transports: [],
         }),
         update: vi.fn().mockResolvedValue(undefined),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'user-1',
+          passkeys: [{ credentialId: CRED_ID, transports: [] }],
+        }),
       },
     };
     service = new PasskeyService(prisma as unknown as PrismaService);
@@ -98,5 +105,47 @@ describe('PasskeyService — usernameless challenge handling', () => {
     vi.advanceTimersByTime(5 * 60 * 1000 + 1); // past the 5 minute TTL
     const response = buildAuthResponse(ISSUED_CHALLENGE);
     await expect(service.verifyAuthentication(response)).rejects.toThrow('No challenge found');
+  });
+
+  describe('username flow (challenge keyed by userId)', () => {
+    it('verifies against the stored challenge looked up by userId', async () => {
+      await service.generateAuthenticationOptions('alice'); // stores challenge under user.id
+      const response = buildAuthResponse(ISSUED_CHALLENGE);
+
+      const result = await service.verifyAuthentication(response, 'user-1');
+
+      expect(result.userId).toBe('user-1');
+      expect(verifyAuthenticationResponse).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(verifyAuthenticationResponse).mock.calls[0][0].expectedChallenge).toBe(
+        ISSUED_CHALLENGE,
+      );
+    });
+
+    it('rejects replay of a consumed username-flow challenge', async () => {
+      await service.generateAuthenticationOptions('alice');
+      const response = buildAuthResponse(ISSUED_CHALLENGE);
+      await service.verifyAuthentication(response, 'user-1');
+      await expect(service.verifyAuthentication(response, 'user-1')).rejects.toThrow(
+        'No challenge found',
+      );
+    });
+
+    it('rejects a userId with no issued challenge (no verification attempted)', async () => {
+      const response = buildAuthResponse(ISSUED_CHALLENGE);
+      await expect(service.verifyAuthentication(response, 'user-1')).rejects.toThrow(
+        'No challenge found',
+      );
+      expect(verifyAuthenticationResponse).not.toHaveBeenCalled();
+    });
+
+    it('expires a username-flow challenge after the TTL', async () => {
+      vi.useFakeTimers();
+      await service.generateAuthenticationOptions('alice');
+      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+      const response = buildAuthResponse(ISSUED_CHALLENGE);
+      await expect(service.verifyAuthentication(response, 'user-1')).rejects.toThrow(
+        'No challenge found',
+      );
+    });
   });
 });

@@ -52,19 +52,19 @@ export class PasskeyService {
     this.challenges.set(key, { challenge, expiresAt: Date.now() + CHALLENGE_TTL_MS });
   }
 
-  /** Return a stored, unexpired challenge, or null. Expired entries are evicted on access. */
-  private peekChallenge(key: string): string | null {
+  /**
+   * Atomically take a stored, unexpired challenge (returns it and removes it), or null. Consuming on
+   * read — before the async verification — gives strict one-time-use semantics: a challenge cannot be
+   * replayed even by two concurrent requests, and a failed verification does not leave it reusable
+   * within the TTL window. The removal is synchronous (no await between get and delete), so there is
+   * no time-of-check/time-of-use gap on Node's single-threaded loop.
+   */
+  private consumeChallenge(key: string): string | null {
     const entry = this.challenges.get(key);
     if (!entry) return null;
-    if (entry.expiresAt < Date.now()) {
-      this.challenges.delete(key);
-      return null;
-    }
-    return entry.challenge;
-  }
-
-  private deleteChallenge(key: string): void {
     this.challenges.delete(key);
+    if (entry.expiresAt < Date.now()) return null;
+    return entry.challenge;
   }
 
   private pruneExpiredChallenges(): void {
@@ -103,7 +103,7 @@ export class PasskeyService {
     userId: string,
     response: RegistrationResponseJSON,
   ): Promise<Awaited<ReturnType<typeof verifyRegistrationResponse>>> {
-    const expectedChallenge = this.peekChallenge(userId);
+    const expectedChallenge = this.consumeChallenge(userId);
     if (!expectedChallenge) throw new Error('No challenge found');
 
     const verification = await verifyRegistrationResponse({
@@ -129,7 +129,6 @@ export class PasskeyService {
       },
     });
 
-    this.deleteChallenge(userId);
     return verification;
   }
 
@@ -190,7 +189,7 @@ export class PasskeyService {
     const challengeKey =
       userId !== undefined ? userId : parseClientChallenge(response.response.clientDataJSON);
     if (!challengeKey) throw new Error('No challenge found');
-    const expectedChallenge = this.peekChallenge(challengeKey);
+    const expectedChallenge = this.consumeChallenge(challengeKey);
     if (!expectedChallenge) throw new Error('No challenge found');
 
     const verification = await verifyAuthenticationResponse({
@@ -211,7 +210,6 @@ export class PasskeyService {
         where: { id: passkey.id },
         data: { counter: BigInt(verification.authenticationInfo.newCounter) },
       });
-      this.deleteChallenge(challengeKey);
     }
 
     return { verification, userId: passkey.userId };
