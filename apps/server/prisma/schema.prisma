@@ -34,14 +34,15 @@ enum Role {
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String   @map("user_id")
-  refreshToken String   @unique @map("refresh_token")
-  ipAddress    String?  @map("ip_address")
-  userAgent    String?  @map("user_agent")
-  totpVerified Boolean  @default(false) @map("totp_verified")
-  expiresAt    DateTime @map("expires_at")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  // HMAC-SHA256 of the refresh token (never the plaintext) so a DB leak cannot replay sessions.
+  refreshTokenHash String   @unique @map("refresh_token_hash")
+  ipAddress        String?  @map("ip_address")
+  userAgent        String?  @map("user_agent")
+  totpVerified     Boolean  @default(false) @map("totp_verified")
+  expiresAt        DateTime @map("expires_at")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

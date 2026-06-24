@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
@@ -14,6 +15,10 @@ type SessionRow = {
   createdAt: Date;
   expiresAt: Date;
 };
+
+const TEST_JWT_SECRET = 'test-jwt-secret-at-least-32-characters-long';
+const hashRefreshToken = (token: string) =>
+  createHmac('sha256', TEST_JWT_SECRET).update(`refresh-token:${token}`).digest('hex');
 
 const mockUser = {
   id: 'user-1',
@@ -40,7 +45,7 @@ describe('AuthService', () => {
         create: vi.fn().mockResolvedValue({
           id: 'session-1',
           userId: mockUser.id,
-          refreshToken: 'rt',
+          refreshTokenHash: hashRefreshToken('rt'),
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           totpVerified: true,
           ipAddress: null,
@@ -70,6 +75,7 @@ describe('AuthService', () => {
       usersService as UsersService,
       jwtService as JwtService,
       totpService as TotpService,
+      TEST_JWT_SECRET,
     );
   });
 
@@ -84,6 +90,17 @@ describe('AuthService', () => {
         refreshToken: expect.any(String),
         requiresTotp: false,
       });
+    });
+
+    it('stores the HMAC of the refresh token, never the plaintext', async () => {
+      const result = await authService.register('testuser', 'password');
+      const createArg = vi.mocked(prisma.session!.create!).mock.calls[0][0] as {
+        data: Record<string, unknown>;
+      };
+      expect(createArg.data['refreshToken']).toBeUndefined();
+      expect(createArg.data['refreshTokenHash']).toBe(hashRefreshToken(result.refreshToken));
+      // The stored value must differ from the token handed to the client.
+      expect(createArg.data['refreshTokenHash']).not.toBe(result.refreshToken);
     });
 
     it('should pass session context to session create', async () => {
@@ -185,7 +202,7 @@ describe('AuthService', () => {
       vi.mocked(prisma.session!.findUnique!).mockResolvedValue({
         id: 's1',
         userId: mockUser.id,
-        refreshToken: 'rt',
+        refreshTokenHash: hashRefreshToken('rt'),
         expiresAt: new Date(Date.now() - 1000),
         totpVerified: true,
         ipAddress: null,
@@ -200,7 +217,7 @@ describe('AuthService', () => {
       vi.mocked(prisma.session!.findUnique!).mockResolvedValue({
         id: 's1',
         userId: mockUser.id,
-        refreshToken: 'rt',
+        refreshTokenHash: hashRefreshToken('rt'),
         expiresAt: new Date(Date.now() + 86400000),
         totpVerified: true,
         ipAddress: null,
@@ -215,10 +232,10 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    it('should delete sessions by refresh token', async () => {
+    it('should delete sessions by hashed refresh token (never the plaintext)', async () => {
       await authService.logout('refresh-token');
       expect(prisma.session?.deleteMany).toHaveBeenCalledWith({
-        where: { refreshToken: 'refresh-token' },
+        where: { refreshTokenHash: hashRefreshToken('refresh-token') },
       });
     });
   });
