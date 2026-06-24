@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { EventsService } from '../events/events.service.js';
 import type { ConnectionStatus as PrismaConnectionStatus } from '@/generated/prisma/client.js';
-import type { PermissionDescriptor } from '@bunker46/shared-types';
+import { DEFAULT_CONNECTION_PERMISSIONS, type PermissionDescriptor } from '@bunker46/shared-types';
 
 @Injectable()
 export class ConnectionsService {
@@ -45,6 +45,13 @@ export class ConnectionsService {
       remotePubkey?: string;
     },
   ) {
+    // Authorization (C1): bind a connection only to an nsec key the caller actually owns. Without
+    // this, an authenticated user could create a connection referencing another user's nsecKeyId and
+    // have the bunker sign/decrypt with the victim's private key. Scope the lookup by userId so a
+    // foreign or non-existent key is indistinguishable.
+    const key = await this.prisma.nsecKey.findFirst({ where: { id: nsecKeyId, userId } });
+    if (!key) throw new NotFoundException('Key not found');
+
     const conn = await this.prisma.bunkerConnection.create({
       data: {
         userId,
@@ -57,10 +64,25 @@ export class ConnectionsService {
         remotePubkey: data.remotePubkey,
         status: 'PENDING',
       },
+    });
+
+    // Seed a conservative default permission set so the connection is usable under the default-deny
+    // RPC handler without being fail-open. Callers with an explicit permission list (controller
+    // body.perms / the connect request's perms param) overwrite these via setPermissions afterwards.
+    await this.prisma.connectionPermission.createMany({
+      data: DEFAULT_CONNECTION_PERMISSIONS.map((p) => ({
+        connectionId: conn.id,
+        method: p.method,
+        kind: p.kind ?? null,
+      })),
+    });
+
+    await this.eventsService.publishUserActivity(userId);
+
+    return this.prisma.bunkerConnection.findUniqueOrThrow({
+      where: { id: conn.id },
       include: { permissions: true },
     });
-    await this.eventsService.publishUserActivity(userId);
-    return conn;
   }
 
   async listConnections(userId: string) {

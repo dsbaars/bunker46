@@ -136,10 +136,10 @@ export class BunkerRpcHandler {
             `sign_event kind:${eventKind} from ${clientPubkey.slice(0, 12)}... (conn: ${connection.name})`,
           );
 
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'sign_event', kind: eventKind })
-          ) {
+          // Default-deny: every capability method (sign_event, nip04/nip44 encrypt/decrypt) requires
+          // an explicit matching permission. A connection with no stored permissions can perform none
+          // of them — unlike the previous fail-open behaviour where an empty set allowed everything.
+          if (!checkPermission(permissions, { method: 'sign_event', kind: eventKind })) {
             error = `Permission denied for sign_event kind:${eventKind}`;
             break;
           }
@@ -149,10 +149,7 @@ export class BunkerRpcHandler {
         }
 
         case 'nip04_encrypt': {
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'nip04_encrypt' })
-          ) {
+          if (!checkPermission(permissions, { method: 'nip04_encrypt' })) {
             error = 'Permission denied for nip04_encrypt';
             break;
           }
@@ -166,10 +163,7 @@ export class BunkerRpcHandler {
         }
 
         case 'nip04_decrypt': {
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'nip04_decrypt' })
-          ) {
+          if (!checkPermission(permissions, { method: 'nip04_decrypt' })) {
             error = 'Permission denied for nip04_decrypt';
             break;
           }
@@ -183,10 +177,7 @@ export class BunkerRpcHandler {
         }
 
         case 'nip44_encrypt': {
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'nip44_encrypt' })
-          ) {
+          if (!checkPermission(permissions, { method: 'nip44_encrypt' })) {
             error = 'Permission denied for nip44_encrypt';
             break;
           }
@@ -200,10 +191,7 @@ export class BunkerRpcHandler {
         }
 
         case 'nip44_decrypt': {
-          if (
-            permissions.length > 0 &&
-            !checkPermission(permissions, { method: 'nip44_decrypt' })
-          ) {
+          if (!checkPermission(permissions, { method: 'nip44_decrypt' })) {
             error = 'Permission denied for nip44_decrypt';
             break;
           }

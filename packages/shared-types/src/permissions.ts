@@ -7,6 +7,23 @@ export const PermissionDescriptorSchema = z.object({
 });
 export type PermissionDescriptor = z.infer<typeof PermissionDescriptorSchema>;
 
+/**
+ * Conservative default permissions seeded on a newly created connection when neither the client
+ * (via the connect request) nor the operator (via the dashboard) supplies an explicit set.
+ *
+ * Bounded to common signing kinds (profile, note, contacts, DM, reaction). It deliberately grants
+ * NO nip04/nip44 decrypt (nor encrypt), so a fresh connection can never act as a blanket decryption
+ * oracle on the user's key. The RPC handler is default-deny, so a connection with zero permissions
+ * can perform no signing/encryption until these — or explicit permissions — are granted.
+ */
+export const DEFAULT_CONNECTION_PERMISSIONS: readonly PermissionDescriptor[] = [
+  { method: 'sign_event', kind: 0 }, // profile metadata
+  { method: 'sign_event', kind: 1 }, // short text note
+  { method: 'sign_event', kind: 3 }, // contacts / follow list
+  { method: 'sign_event', kind: 4 }, // encrypted direct message
+  { method: 'sign_event', kind: 7 }, // reaction
+];
+
 export function parsePermissionString(perm: string): PermissionDescriptor {
   const [method, kindStr] = perm.split(':');
   const parsed = Nip46Method.parse(method);

@@ -17,12 +17,16 @@ describe('ConnectionsService', () => {
         create: vi.fn().mockResolvedValue({ id: 'key-1', publicKey: 'pub', label: 'My Key' }),
         findMany: vi.fn().mockResolvedValue([]),
         findUnique: vi.fn().mockResolvedValue(null),
+        findFirst: vi.fn().mockResolvedValue(null),
         delete: vi.fn().mockResolvedValue(undefined),
       },
       bunkerConnection: {
         create: vi.fn().mockResolvedValue({ id: 'conn-1', status: 'PENDING' }),
         findMany: vi.fn().mockResolvedValue([]),
         findUnique: vi.fn().mockResolvedValue(null),
+        findUniqueOrThrow: vi
+          .fn()
+          .mockResolvedValue({ id: 'conn-1', status: 'PENDING', permissions: [] }),
         findFirst: vi.fn().mockResolvedValue(null),
         update: vi.fn().mockResolvedValue({}),
         delete: vi.fn().mockResolvedValue(undefined),
@@ -84,8 +88,18 @@ describe('ConnectionsService', () => {
   });
 
   describe('createConnection', () => {
-    it('should create connection and publish activity', async () => {
+    it('should create connection, seed default permissions and publish activity', async () => {
+      vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue({
+        id: 'key-1',
+        userId: 'user-1',
+      } as never);
+
       await service.createConnection('user-1', 'key-1', 'client-pub', { name: 'App' });
+
+      // C1: ownership of the nsec key is verified, scoped by the authenticated userId.
+      expect(prisma.nsecKey?.findFirst).toHaveBeenCalledWith({
+        where: { id: 'key-1', userId: 'user-1' },
+      });
       expect(prisma.bunkerConnection?.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -97,7 +111,28 @@ describe('ConnectionsService', () => {
           }),
         }),
       );
+      // H2: a conservative default permission set is seeded so the connection is not fail-open.
+      const seedArg = vi.mocked(prisma.connectionPermission!.createMany!).mock.calls[0]?.[0] as {
+        data: Array<{ connectionId: string; method: string; kind: number | null }>;
+      };
+      expect(seedArg.data.length).toBeGreaterThan(0);
+      expect(seedArg.data.every((p) => p.connectionId === 'conn-1')).toBe(true);
+      expect(seedArg.data.every((p) => p.method === 'sign_event')).toBe(true);
+      expect(seedArg.data.map((p) => p.kind)).toEqual(expect.arrayContaining([0, 1, 3, 4, 7]));
       expect(eventsService.publishUserActivity).toHaveBeenCalledWith('user-1');
+    });
+
+    it('should throw NotFoundException when the nsec key does not belong to the user (C1)', async () => {
+      // findFirst scoped by { id, userId } returns null for a foreign or non-existent key.
+      vi.mocked(prisma.nsecKey!.findFirst!).mockResolvedValue(null as never);
+
+      await expect(
+        service.createConnection('attacker', 'victim-key', 'client-pub', { name: 'Evil' }),
+      ).rejects.toThrow(NotFoundException);
+
+      // The connection is never created and no key is bound.
+      expect(prisma.bunkerConnection?.create).not.toHaveBeenCalled();
+      expect(prisma.connectionPermission?.createMany).not.toHaveBeenCalled();
     });
   });
 

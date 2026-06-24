@@ -123,9 +123,14 @@ export class ConnectionsController {
     if (body.perms) {
       try {
         const permissions = parsePermissionList(body.perms);
-        await this.connectionsService.setPermissions(conn.id, permissions);
+        // Only override the seeded default permissions when an explicit, non-empty set was supplied;
+        // an empty/invalid perms string leaves the conservative defaults in place (not a locked-out
+        // connection under the default-deny handler).
+        if (permissions.length > 0) {
+          await this.connectionsService.setPermissions(conn.id, permissions);
+        }
       } catch {
-        // Invalid perms string - continue without setting permissions
+        // Invalid perms string - continue with the seeded default permissions
       }
     }
 
