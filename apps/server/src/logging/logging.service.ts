@@ -5,6 +5,10 @@ import type { Prisma } from '@/generated/prisma/client.js';
 
 interface LogEntry {
   connectionId: string;
+  // Denormalized so the log survives connection deletion (FK is SET NULL) and stays scoped/readable.
+  userId: string;
+  connectionName: string;
+  clientPubkey: string;
   method: string;
   eventKind?: number;
   result: 'APPROVED' | 'DENIED' | 'ERROR';
@@ -24,6 +28,9 @@ export class LoggingService {
       await this.prisma.signingLog.create({
         data: {
           connectionId: entry.connectionId,
+          userId: entry.userId,
+          connectionName: entry.connectionName,
+          clientPubkey: entry.clientPubkey,
           method: entry.method,
           eventKind: entry.eventKind,
           result: entry.result as LogResult,
@@ -44,18 +51,17 @@ export class LoggingService {
     connectionName?: string,
     method?: string,
   ) {
+    // Scope by the denormalized userId/connectionName so logs from deleted connections
+    // (connectionId is null) still appear in the owner's activity feed.
     const where: Prisma.SigningLogWhereInput = {
-      connection: {
-        userId,
-        ...(connectionName ? { name: connectionName } : {}),
-      },
+      userId,
+      ...(connectionName ? { connectionName } : {}),
       ...(method ? { method } : {}),
     };
 
     const [data, total] = await Promise.all([
       this.prisma.signingLog.findMany({
         where,
-        include: { connection: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -68,7 +74,7 @@ export class LoggingService {
         id: log.id,
         method: log.method,
         eventKind: log.eventKind,
-        connectionName: log.connection.name,
+        connectionName: log.connectionName,
         result: log.result,
         timestamp: log.createdAt.toISOString(),
       })),

@@ -15,6 +15,7 @@ describe('StatsService', () => {
       },
       signingLog: {
         count: vi.fn().mockResolvedValueOnce(10).mockResolvedValueOnce(42),
+        // Call order in getDashboardStats: methodCounts, kindCounts, connectionNames, distinctMethods.
         groupBy: vi
           .fn()
           .mockResolvedValueOnce([
@@ -22,6 +23,7 @@ describe('StatsService', () => {
             { method: 'ping', _count: { method: 2 } },
           ])
           .mockResolvedValueOnce([{ eventKind: 1, _count: { eventKind: 5 } }])
+          .mockResolvedValueOnce([{ connectionName: 'App' }, { connectionName: 'Deleted App' }])
           .mockResolvedValueOnce([{ method: 'sign_event' }, { method: 'ping' }]),
         findMany: vi.fn(),
       },
@@ -46,7 +48,9 @@ describe('StatsService', () => {
         signingByMethod: { sign_event: 8, ping: 2 },
         signingByKind: { '1': 5 },
         chartRange: '7d',
-        connectionNames: ['App', 'Other'],
+        // Union of live connection names (App, Other) + names preserved on logs (App, Deleted App),
+        // so a deleted connection stays filterable.
+        connectionNames: ['App', 'Deleted App', 'Other'],
         methods: ['ping', 'sign_event'],
       });
       expect(result.activityBuckets).toHaveLength(7);
@@ -63,14 +67,29 @@ describe('StatsService', () => {
         expect.objectContaining({ where: expect.objectContaining({ userId: 'user-99' }) }),
       );
       expect(prisma.bunkerConnection?.count).toHaveBeenCalledTimes(2);
+      // connectionNames now unions live connection names with names preserved on logs, sorted in JS.
       expect(prisma.bunkerConnection?.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-99' },
         select: { name: true },
-        orderBy: { name: 'asc' },
       });
       expect(prisma.signingLog?.count).toHaveBeenCalledTimes(2);
-      expect(prisma.signingLog?.groupBy).toHaveBeenCalledTimes(3);
+      expect(prisma.signingLog?.groupBy).toHaveBeenCalledTimes(4);
       expect(prisma.$queryRaw).toHaveBeenCalled();
+    });
+
+    it('scopes every signingLog query by the denormalized userId, not the connection relation', async () => {
+      await service.getDashboardStats('user-99');
+      // A revert to `connection: { userId }` would silently drop deleted-connection logs from
+      // counts/charts — assert the denormalized scoping on every count + groupBy call.
+      const calls = [
+        ...vi.mocked(prisma.signingLog!.count!).mock.calls,
+        ...vi.mocked(prisma.signingLog!.groupBy!).mock.calls,
+      ];
+      expect(calls.length).toBeGreaterThan(0);
+      for (const [args] of calls) {
+        expect(args.where).toMatchObject({ userId: 'user-99' });
+        expect(args.where).not.toHaveProperty('connection');
+      }
     });
   });
 });

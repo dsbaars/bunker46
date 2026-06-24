@@ -24,6 +24,9 @@ describe('LoggingService', () => {
     it('should create signing log entry', async () => {
       await service.logSigningAction({
         connectionId: 'conn-1',
+        userId: 'user-1',
+        connectionName: 'My App',
+        clientPubkey: 'a'.repeat(64),
         method: 'sign_event',
         result: 'APPROVED',
         durationMs: 100,
@@ -31,6 +34,9 @@ describe('LoggingService', () => {
       expect(prisma.signingLog?.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           connectionId: 'conn-1',
+          userId: 'user-1',
+          connectionName: 'My App',
+          clientPubkey: 'a'.repeat(64),
           method: 'sign_event',
           result: 'APPROVED',
           durationMs: 100,
@@ -43,6 +49,9 @@ describe('LoggingService', () => {
     it('should include eventKind and metadata when provided', async () => {
       await service.logSigningAction({
         connectionId: 'conn-1',
+        userId: 'user-1',
+        connectionName: 'My App',
+        clientPubkey: 'a'.repeat(64),
         method: 'sign_event',
         eventKind: 1,
         result: 'DENIED',
@@ -54,6 +63,54 @@ describe('LoggingService', () => {
           eventKind: 1,
           metadata: { reason: 'user_denied' },
         }),
+      });
+    });
+  });
+
+  describe('getDashboardActivity', () => {
+    it('scopes by denormalized userId (not the connection relation) so deleted-connection logs survive', async () => {
+      vi.mocked(prisma.signingLog!.findMany!).mockResolvedValue([
+        {
+          id: 'log-1',
+          connectionId: null, // connection was deleted; FK is SET NULL
+          connectionName: 'Deleted App',
+          method: 'sign_event',
+          eventKind: 1,
+          result: 'APPROVED',
+          createdAt: new Date('2026-01-01T00:00:00Z'),
+        } as never,
+      ]);
+      vi.mocked(prisma.signingLog!.count!).mockResolvedValue(1);
+
+      const result = await service.getDashboardActivity('user-1');
+
+      // Must filter on the denormalized userId, never via `connection: { userId }`,
+      // otherwise orphaned (connectionId=null) logs drop out of the feed.
+      const findManyArgs = vi.mocked(prisma.signingLog!.findMany!).mock.calls[0]![0]!;
+      expect(findManyArgs.where).toEqual({ userId: 'user-1' });
+      expect(findManyArgs.where).not.toHaveProperty('connection');
+      // No relation include anymore — the name comes from the denormalized column.
+      expect(findManyArgs).not.toHaveProperty('include');
+
+      expect(result.data[0]).toMatchObject({
+        id: 'log-1',
+        connectionName: 'Deleted App',
+        method: 'sign_event',
+      });
+      expect(result.total).toBe(1);
+    });
+
+    it('applies connectionName and method filters against denormalized columns', async () => {
+      vi.mocked(prisma.signingLog!.findMany!).mockResolvedValue([]);
+      vi.mocked(prisma.signingLog!.count!).mockResolvedValue(0);
+
+      await service.getDashboardActivity('user-1', 1, 15, 'My App', 'sign_event');
+
+      const findManyArgs = vi.mocked(prisma.signingLog!.findMany!).mock.calls[0]![0]!;
+      expect(findManyArgs.where).toEqual({
+        userId: 'user-1',
+        connectionName: 'My App',
+        method: 'sign_event',
       });
     });
   });

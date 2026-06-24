@@ -49,30 +49,38 @@ export class StatsService {
       this.prisma.bunkerConnection.count({ where: { userId } }),
       this.prisma.bunkerConnection.count({ where: { userId, status: 'ACTIVE' } }),
       this.prisma.signingLog.count({
-        where: { connection: { userId }, createdAt: { gte: twentyFourHoursAgo } },
+        where: { userId, createdAt: { gte: twentyFourHoursAgo } },
       }),
       this.prisma.signingLog.count({
-        where: { connection: { userId }, createdAt: { gte: sevenDaysAgo } },
+        where: { userId, createdAt: { gte: sevenDaysAgo } },
       }),
       this.prisma.signingLog.groupBy({
         by: ['method'],
-        where: { connection: { userId }, createdAt: { gte: rangeStart } },
+        where: { userId, createdAt: { gte: rangeStart } },
         _count: { method: true },
       }),
       this.prisma.signingLog.groupBy({
         by: ['eventKind'],
         where: {
-          connection: { userId },
+          userId,
           createdAt: { gte: rangeStart },
           eventKind: { not: null },
         },
         _count: { eventKind: true },
       }),
-      this.prisma.bunkerConnection
-        .findMany({ where: { userId }, select: { name: true }, orderBy: { name: 'asc' } })
-        .then((rows) => rows.map((r) => r.name)),
+      // Union of live connection names + names preserved on logs, so deleted connections
+      // (whose logs survive with connectionId=null) remain filterable in the dashboard.
+      Promise.all([
+        this.prisma.bunkerConnection.findMany({ where: { userId }, select: { name: true } }),
+        this.prisma.signingLog.groupBy({ by: ['connectionName'], where: { userId } }),
+      ]).then(([conns, logs]) => {
+        const names = new Set<string>();
+        for (const c of conns) names.add(c.name);
+        for (const l of logs) names.add(l.connectionName);
+        return Array.from(names).sort();
+      }),
       this.prisma.signingLog
-        .groupBy({ by: ['method'], where: { connection: { userId } } })
+        .groupBy({ by: ['method'], where: { userId } })
         .then((rows) => rows.map((r) => r.method).sort()),
     ]);
 
@@ -122,12 +130,11 @@ export class StatsService {
 
     if (range === '7d') {
       const rows = await this.prisma.$queryRaw<Array<{ ts: Date; count: bigint }>>`
-        SELECT DATE(sl.created_at) AS ts, COUNT(*) AS count
-        FROM signing_logs sl
-        JOIN bunker_connections bc ON sl.connection_id = bc.id
-        WHERE bc.user_id = ${userId}
-          AND sl.created_at >= ${rangeStart}
-        GROUP BY DATE(sl.created_at)
+        SELECT DATE(created_at) AS ts, COUNT(*) AS count
+        FROM signing_logs
+        WHERE user_id = ${userId}
+          AND created_at >= ${rangeStart}
+        GROUP BY DATE(created_at)
         ORDER BY ts ASC
       `;
       const map = new Map<string, number>();
@@ -150,12 +157,11 @@ export class StatsService {
 
     if (range === '24h') {
       const rows = await this.prisma.$queryRaw<Array<{ ts: Date; count: bigint }>>`
-        SELECT DATE_TRUNC('hour', sl.created_at) AS ts, COUNT(*) AS count
-        FROM signing_logs sl
-        JOIN bunker_connections bc ON sl.connection_id = bc.id
-        WHERE bc.user_id = ${userId}
-          AND sl.created_at >= ${rangeStart}
-        GROUP BY DATE_TRUNC('hour', sl.created_at)
+        SELECT DATE_TRUNC('hour', created_at) AS ts, COUNT(*) AS count
+        FROM signing_logs
+        WHERE user_id = ${userId}
+          AND created_at >= ${rangeStart}
+        GROUP BY DATE_TRUNC('hour', created_at)
         ORDER BY ts ASC
       `;
       const map = new Map<string, number>();
@@ -182,13 +188,12 @@ export class StatsService {
     // 1h — 5-minute buckets (12 slots)
     const rows = await this.prisma.$queryRaw<Array<{ ts: Date; count: bigint }>>`
       SELECT
-        TO_TIMESTAMP(FLOOR(EXTRACT(EPOCH FROM sl.created_at) / 300) * 300) AS ts,
+        TO_TIMESTAMP(FLOOR(EXTRACT(EPOCH FROM created_at) / 300) * 300) AS ts,
         COUNT(*) AS count
-      FROM signing_logs sl
-      JOIN bunker_connections bc ON sl.connection_id = bc.id
-      WHERE bc.user_id = ${userId}
-        AND sl.created_at >= ${rangeStart}
-      GROUP BY FLOOR(EXTRACT(EPOCH FROM sl.created_at) / 300)
+      FROM signing_logs
+      WHERE user_id = ${userId}
+        AND created_at >= ${rangeStart}
+      GROUP BY FLOOR(EXTRACT(EPOCH FROM created_at) / 300)
       ORDER BY ts ASC
     `;
     const map = new Map<number, number>();

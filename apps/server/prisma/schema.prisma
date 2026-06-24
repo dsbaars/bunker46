@@ -23,6 +23,7 @@ model User {
   passkeys     Passkey[]
   nsecKeys     NsecKey[]
   connections  BunkerConnection[]
+  signingLogs  SigningLog[]
   relayConfigs RelayConfig[]
 
   @@map("users")
@@ -131,19 +132,27 @@ model ConnectionPermission {
 }
 
 model SigningLog {
-  id           String   @id @default(cuid())
-  connectionId String   @map("connection_id")
-  method       String
-  eventKind    Int?     @map("event_kind")
-  result       LogResult
-  durationMs   Int      @map("duration_ms")
-  errorMessage String?  @map("error_message")
-  metadata     Json?
-  createdAt    DateTime @default(now()) @map("created_at")
+  id           String    @id @default(cuid())
+  // Nullable: when a connection is deleted the FK is set to null (ON DELETE SET NULL) so the
+  // audit record survives. The owning user, connection name and client pubkey below are
+  // denormalized at write time so an orphaned log stays scoped to its user and readable.
+  connectionId   String?   @map("connection_id")
+  userId         String    @map("user_id")
+  connectionName String    @map("connection_name")
+  clientPubkey   String    @map("client_pubkey")
+  method         String
+  eventKind      Int?      @map("event_kind")
+  result         LogResult
+  durationMs     Int       @map("duration_ms")
+  errorMessage   String?   @map("error_message")
+  metadata       Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
 
-  connection BunkerConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connection BunkerConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([connectionId])
+  @@index([userId])
   @@index([createdAt])
   @@index([method])
   @@map("signing_logs")
