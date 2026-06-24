@@ -53,18 +53,36 @@ export class AuthController {
   ) {}
 
   @Get('config')
-  getAuthConfig() {
+  async getAuthConfig() {
     const loginNotice = process.env['LOGIN_NOTICE']?.trim() || null;
+    // Until the first account exists, keep advertising the sign-up form even
+    // when public registration is disabled (first-run setup). Short-circuit so
+    // the DB is only queried when the env flag alone cannot decide, and never
+    // let a DB hiccup turn the public login config into a 500.
+    const registrationEnabled = isRegistrationAllowed() || (await this.noUsersExistSafe());
     return {
-      registrationEnabled: isRegistrationAllowed(),
+      registrationEnabled,
       loginNotice,
     };
+  }
+
+  private async noUsersExistSafe(): Promise<boolean> {
+    try {
+      return (await this.usersService.count()) === 0;
+    } catch {
+      return false;
+    }
   }
 
   @Post('register')
   @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   async register(@Req() req: FastifyRequest, @Body() body: unknown) {
-    if (!isRegistrationAllowed()) {
+    const registrationAllowed = isRegistrationAllowed();
+    // Cheap pre-check so we do not hash a password for requests that cannot
+    // succeed. The authoritative, race-free gate (the very first account may be
+    // created even when public registration is disabled) is enforced atomically
+    // in UsersService.create.
+    if (!registrationAllowed && (await this.usersService.count()) > 0) {
       throw new ForbiddenException('Registration is disabled');
     }
     const parsed = RegisterRequestSchema.safeParse(body);
@@ -75,6 +93,7 @@ export class AuthController {
       parsed.data.username,
       parsed.data.password,
       sessionContextFromRequest(req),
+      { allowWhenUsersExist: registrationAllowed },
     );
   }
 

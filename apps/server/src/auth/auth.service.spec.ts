@@ -76,7 +76,7 @@ describe('AuthService', () => {
   describe('register', () => {
     it('should create user and return tokens', async () => {
       const result = await authService.register('testuser', 'password');
-      expect(usersService.create).toHaveBeenCalledWith('testuser', 'password');
+      expect(usersService.create).toHaveBeenCalledWith('testuser', 'password', undefined);
       expect(prisma.session?.create).toHaveBeenCalled();
       expect(jwtService.signAsync).toHaveBeenCalled();
       expect(result).toEqual({

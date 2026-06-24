@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Prisma } from '@/generated/prisma/client.js';
 import type { User } from '@/generated/prisma/client.js';
 import { UsersService } from './users.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
@@ -29,12 +35,18 @@ describe('UsersService', () => {
 
   beforeEach(() => {
     prisma = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
       user: {
         findUnique: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue(mockUser),
         update: vi.fn().mockResolvedValue(mockUser),
+        count: vi.fn().mockResolvedValue(0),
       },
     };
+    // Run interactive transactions inline against the same mocked client.
+    prisma.$transaction = vi.fn((cb: (tx: PrismaService) => unknown) =>
+      Promise.resolve(cb(prisma as PrismaService)),
+    ) as PrismaService['$transaction'];
     usersService = new UsersService(prisma as PrismaService);
     vi.mocked(argon2.hash).mockResolvedValue('hashed-password');
     vi.mocked(argon2.verify).mockResolvedValue(true);
@@ -55,6 +67,46 @@ describe('UsersService', () => {
         data: { username: 'newuser', passwordHash: 'hashed-password' },
       });
       expect(result).toEqual(mockUser);
+    });
+
+    it('creates the first account atomically when registration is disabled and the table is empty', async () => {
+      vi.mocked(prisma.user!.count!).mockResolvedValue(0);
+      const result = await usersService.create('owner', 'password', {
+        allowWhenUsersExist: false,
+      });
+      // Count + insert run inside one advisory-locked transaction.
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.user?.create).toHaveBeenCalledWith({
+        data: { username: 'owner', passwordHash: 'hashed-password' },
+      });
+      expect(result).toEqual(mockUser);
+    });
+
+    it('rejects the bootstrap account when a user already exists', async () => {
+      vi.mocked(prisma.user!.count!).mockResolvedValue(1);
+      await expect(
+        usersService.create('owner', 'password', { allowWhenUsersExist: false }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user?.create).not.toHaveBeenCalled();
+    });
+
+    it('skips the empty-table guard when registration is allowed', async () => {
+      vi.mocked(prisma.user!.count!).mockResolvedValue(5);
+      const result = await usersService.create('newuser', 'password', {
+        allowWhenUsersExist: true,
+      });
+      expect(prisma.user?.count).not.toHaveBeenCalled();
+      expect(result).toEqual(mockUser);
+    });
+
+    it('maps a P2002 unique-violation race to a ConflictException', async () => {
+      const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+      });
+      vi.mocked(prisma.user!.create!).mockRejectedValueOnce(p2002);
+      await expect(usersService.create('newuser', 'password')).rejects.toThrow(ConflictException);
     });
   });
 

@@ -27,8 +27,9 @@ export class AuthService {
     username: string,
     password: string,
     sessionContext?: { ipAddress?: string; userAgent?: string },
+    options?: { allowWhenUsersExist?: boolean },
   ) {
-    const user = await this.usersService.create(username, password);
+    const user = await this.usersService.create(username, password, options);
     return this.createTokens(user.id, user.username, true, sessionContext, user.role, false);
   }
 
