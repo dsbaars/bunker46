@@ -18,8 +18,13 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCookie from '@fastify/cookie';
 import { AppModule } from './app.module.js';
 import { serverEnvSchema } from '@bunker46/config';
+import { installProcessGuards } from './common/process-guards.js';
 
 async function bootstrap() {
+  // Survive transient relay errors thrown asynchronously by nostr-tools (otherwise a flaky relay
+  // can crash the whole bunker); exit on any genuine fault so the container restarts cleanly.
+  installProcessGuards();
+
   const env = serverEnvSchema.parse(process.env);
 
   const app = await NestFactory.create<NestFastifyApplication>(
