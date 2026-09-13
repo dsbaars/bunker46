@@ -65,7 +65,7 @@ export class BunkerController {
     const relays = await this.getActiveRelaysForUser(req.user.sub);
     const secret = randomBytes(16).toString('hex');
 
-    this.bunkerService.registerPendingSecret(key.publicKey, secret, {
+    await this.bunkerService.registerPendingSecret(key.publicKey, secret, {
       userId: req.user.sub,
       nsecKeyId: body.nsecKeyId,
       name: body.name || 'Bunker46',
@@ -109,7 +109,7 @@ export class BunkerController {
   async getStatus() {
     return {
       activeListeners: this.bunkerService.getActiveListenerCount(),
-      pendingSecrets: this.bunkerService.getPendingSecretCount(),
+      pendingSecrets: await this.bunkerService.getPendingSecretCount(),
     };
   }
 

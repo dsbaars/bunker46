@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NOSTR_CONSTANTS } from '@bunker46/config';
 import { BunkerService } from './bunker.service.js';
@@ -31,9 +32,15 @@ describe('BunkerService', () => {
         findUnique: vi.fn().mockResolvedValue(null),
       },
       relayConfig: { findMany: vi.fn().mockResolvedValue([]) },
+      bunkerSecret: {
+        create: vi.fn().mockResolvedValue({}),
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn().mockResolvedValue({}),
+        count: vi.fn().mockResolvedValue(0),
+      },
     };
     encryption = { decrypt: vi.fn().mockReturnValue('decrypted-nsec-hex') };
-    rpcHandler = { setPendingSecretLookup: vi.fn() };
+    rpcHandler = { setPendingSecretLookup: vi.fn(), setSecretBinder: vi.fn() };
     service = new BunkerService(
       rpcHandler as BunkerRpcHandler,
       prisma as PrismaService,
@@ -47,38 +54,85 @@ describe('BunkerService', () => {
     await service.onModuleDestroy();
   });
 
-  describe('pending secrets', () => {
-    it('should register and consume pending secret', () => {
-      const pubkey = 'a'.repeat(64);
-      const secret = 'secret123';
-      const info = { userId: 'u1', nsecKeyId: 'k1', name: 'Test' };
-      service.registerPendingSecret(pubkey, secret, info);
-      expect(service.getPendingSecretCount()).toBe(1);
-      const consumed = service.consumePendingSecret(pubkey, secret);
-      expect(consumed).toEqual(info);
-      expect(service.getPendingSecretCount()).toBe(0);
+  describe('bunker secrets', () => {
+    const pubkey = 'a'.repeat(64);
+    const secret = 'secret123';
+    // Pinned: a change to the hashing scheme would silently invalidate every bunker:// URI
+    // already in the wild, so it should fail here first.
+    const secretHash = createHash('sha256').update(secret).digest('hex');
+
+    const storedSecret = (overrides: Record<string, unknown> = {}) => ({
+      id: 's1',
+      userId: 'u1',
+      nsecKeyId: 'k1',
+      name: 'Test',
+      permissions: null,
+      connectionId: null,
+      nsecKey: { publicKey: pubkey },
+      ...overrides,
     });
 
-    it('should return undefined when consuming unknown secret', () => {
-      const result = service.consumePendingSecret('a'.repeat(64), 'unknown');
-      expect(result).toBeUndefined();
-    });
-
-    it('preserves the operator-chosen permission seed through register/consume', () => {
-      const pubkey = 'b'.repeat(64);
-      const secret = 'secret-with-perms';
-      const info = {
+    it('persists only the hash of the secret, never the secret itself', async () => {
+      await service.registerPendingSecret(pubkey, secret, {
         userId: 'u1',
         nsecKeyId: 'k1',
         name: 'Test',
-        permissions: [
-          { method: 'sign_event' as const, kind: 30078 },
-          { method: 'nip44_decrypt' as const },
-        ],
-      };
-      service.registerPendingSecret(pubkey, secret, info);
-      // The connect handler reads these back to seed the auto-created connection's granted permissions.
-      expect(service.consumePendingSecret(pubkey, secret)).toEqual(info);
+      });
+      const { data } = vi.mocked(prisma.bunkerSecret!.create).mock.calls[0][0];
+      expect(data.secretHash).toBe(secretHash);
+      expect(JSON.stringify(data)).not.toContain(secret);
+    });
+
+    it('resolves a secret WITHOUT invalidating it, so the same URI can reconnect', async () => {
+      vi.mocked(prisma.bunkerSecret!.findUnique).mockResolvedValue(storedSecret());
+
+      // Twice: this is the whole point of the change. A web client that regenerates its ephemeral
+      // NIP-46 keypair on every page load presents this same secret again on the next load.
+      const first = await service.consumePendingSecret(pubkey, secret);
+      const second = await service.consumePendingSecret(pubkey, secret);
+      expect(first).toEqual(second);
+      expect(first).toMatchObject({ secretId: 's1', userId: 'u1', nsecKeyId: 'k1', name: 'Test' });
+      // Nothing is deleted; only the usage counters move.
+      expect(prisma.bunkerSecret!.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns undefined for an unknown secret', async () => {
+      vi.mocked(prisma.bunkerSecret!.findUnique).mockResolvedValue(null);
+      expect(await service.consumePendingSecret(pubkey, 'unknown')).toBeUndefined();
+    });
+
+    it('refuses a secret presented for a different signer key', async () => {
+      // The secret is bound to the nsec key it was minted for, so it cannot be replayed to bind a
+      // connection to some other key.
+      vi.mocked(prisma.bunkerSecret!.findUnique).mockResolvedValue(
+        storedSecret({ nsecKey: { publicKey: 'f'.repeat(64) } }),
+      );
+      expect(await service.consumePendingSecret(pubkey, secret)).toBeUndefined();
+      expect(prisma.bunkerSecret!.update).not.toHaveBeenCalled();
+    });
+
+    it('preserves the operator-chosen permission seed and the owned connection', async () => {
+      const permissions = [
+        { method: 'sign_event' as const, kind: 30078 },
+        { method: 'nip44_decrypt' as const },
+      ];
+      vi.mocked(prisma.bunkerSecret!.findUnique).mockResolvedValue(
+        storedSecret({ permissions, connectionId: 'conn-1' }),
+      );
+      // The connect handler seeds the auto-created connection's granted permissions from these,
+      // and uses connectionId to rebind an existing connection rather than duplicate it.
+      expect(await service.consumePendingSecret(pubkey, secret)).toMatchObject({
+        permissions,
+        connectionId: 'conn-1',
+      });
+    });
+
+    it('drops a permission seed that no longer parses rather than trusting it', async () => {
+      vi.mocked(prisma.bunkerSecret!.findUnique).mockResolvedValue(
+        storedSecret({ permissions: [{ method: 'not_a_real_method' }] }),
+      );
+      // Undefined makes createConnection fall back to the conservative defaults.
+      expect((await service.consumePendingSecret(pubkey, secret))?.permissions).toBeUndefined();
     });
   });
 

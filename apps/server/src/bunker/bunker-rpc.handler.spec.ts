@@ -83,6 +83,106 @@ describe('BunkerRpcHandler', () => {
     );
   });
 
+  describe('bunker:// auto-connect', () => {
+    const NEW_CLIENT = 'client-pubkey-after-reload';
+    const SECRET = 'uri-secret';
+
+    function handleAs(clientPubkey: string, req: Nip46Request) {
+      return handler.handleRequest(
+        clientPubkey,
+        SIGNER,
+        req,
+        signEvent,
+        nip04Encrypt,
+        nip04Decrypt,
+        nip44Encrypt,
+        nip44Decrypt,
+        getPublicKeyFromNsec,
+      );
+    }
+
+    it('creates a connection on first use and records which secret owns it', async () => {
+      const lookup = vi.fn().mockResolvedValue({
+        secretId: 'sec-1',
+        userId: 'user-1',
+        nsecKeyId: 'key-1',
+        name: 'WORD5',
+      });
+      const binder = vi.fn().mockResolvedValue(undefined);
+      handler.setPendingSecretLookup(lookup);
+      handler.setSecretBinder(binder);
+      connections.createConnection = vi.fn().mockResolvedValue({ id: 'conn-1' } as never);
+      vi.mocked(connections.findByClientAndSigner!)
+        .mockResolvedValueOnce(null as never)
+        .mockResolvedValueOnce(makeConnection([{ method: 'sign_event' }], 'PENDING') as never);
+
+      const res = await handleAs(CLIENT, request('connect', [SIGNER, SECRET]));
+
+      expect(res.error).toBeUndefined();
+      expect(connections.createConnection).toHaveBeenCalled();
+      // Binding is what makes the NEXT connect rebind instead of duplicating.
+      expect(binder).toHaveBeenCalledWith('sec-1', 'conn-1');
+    });
+
+    it('rebinds the existing connection when the same URI returns under a new client key', async () => {
+      // The regression this change exists for. Web NIP-46 clients keep their ephemeral client
+      // keypair in memory only and mint a fresh one on every page load, while replaying the same
+      // stored bunker:// URI. Before this, the second load was rejected as an unknown client.
+      const lookup = vi.fn().mockResolvedValue({
+        secretId: 'sec-1',
+        connectionId: 'conn-1',
+        userId: 'user-1',
+        nsecKeyId: 'key-1',
+        name: 'WORD5',
+      });
+      handler.setPendingSecretLookup(lookup);
+      connections.createConnection = vi.fn();
+      connections.rebindClientPubkey = vi
+        .fn()
+        .mockResolvedValue(makeConnection([{ method: 'sign_event' }], 'ACTIVE') as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(null as never);
+
+      const res = await handleAs(NEW_CLIENT, request('connect', [SIGNER, SECRET]));
+
+      expect(res.error).toBeUndefined();
+      expect(connections.rebindClientPubkey).toHaveBeenCalledWith('conn-1', NEW_CLIENT);
+      // One connection per app, not one per page load.
+      expect(connections.createConnection).not.toHaveBeenCalled();
+    });
+
+    it('will not resurrect a revoked connection by replaying its bunker:// URI', async () => {
+      // rebindClientPubkey returns null for a REVOKED or deleted connection. The secret must not
+      // then fall through to creating a fresh one - that would undo the operator's revocation.
+      const lookup = vi.fn().mockResolvedValue({
+        secretId: 'sec-1',
+        connectionId: 'conn-1',
+        userId: 'user-1',
+        nsecKeyId: 'key-1',
+        name: 'WORD5',
+      });
+      handler.setPendingSecretLookup(lookup);
+      connections.createConnection = vi.fn();
+      connections.rebindClientPubkey = vi.fn().mockResolvedValue(null as never);
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(null as never);
+
+      const res = await handleAs(NEW_CLIENT, request('connect', [SIGNER, SECRET]));
+
+      expect(res).toEqual({ id: 'req-1', error: 'Unknown client' });
+      expect(connections.createConnection).not.toHaveBeenCalled();
+    });
+
+    it('rejects a connect whose secret does not resolve', async () => {
+      handler.setPendingSecretLookup(vi.fn().mockResolvedValue(undefined));
+      connections.createConnection = vi.fn();
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(null as never);
+
+      const res = await handleAs(NEW_CLIENT, request('connect', [SIGNER, 'wrong-secret']));
+
+      expect(res).toEqual({ id: 'req-1', error: 'Unknown client' });
+      expect(connections.createConnection).not.toHaveBeenCalled();
+    });
+  });
+
   describe('unknown / revoked connections', () => {
     it('rejects a non-connect request from an unknown client', async () => {
       vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(null as never);

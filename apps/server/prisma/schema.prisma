@@ -25,6 +25,7 @@ model User {
   connections  BunkerConnection[]
   signingLogs  SigningLog[]
   relayConfigs RelayConfig[]
+  bunkerSecrets BunkerSecret[]
 
   @@map("users")
 }
@@ -75,8 +76,9 @@ model NsecKey {
   label          String   @default("Default Key")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connections BunkerConnection[]
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connections   BunkerConnection[]
+  bunkerSecrets BunkerSecret[]
 
   @@unique([userId, publicKey])
   @@index([userId])
@@ -177,4 +179,37 @@ model RelayConfig {
   @@unique([userId, url])
   @@index([userId])
   @@map("relay_configs")
+}
+
+/// A bunker:// URI's secret, persisted so it stays valid for repeat connects.
+///
+/// NIP-46 web clients commonly hold their ephemeral client keypair in memory only and mint a
+/// fresh one on every page load, re-presenting the SAME stored bunker:// URI each time. A
+/// single-use, in-memory secret therefore authorises exactly one page load: the next one
+/// arrives as an unknown client and every request is rejected. Persisting the secret lets the
+/// same URI rebind to the client key of the day.
+///
+/// Only the SHA-256 hash of the secret is stored: the secret is a bearer credential, so a
+/// database leak must not yield working bunker:// URIs.
+model BunkerSecret {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  nsecKeyId    String    @map("nsec_key_id")
+  secretHash   String    @unique @map("secret_hash")
+  name         String    @default("Bunker46")
+  /// Operator-chosen permission seed captured when the URI was generated, applied to the
+  /// connection this secret creates. Stored as a PermissionDescriptor[].
+  permissions  Json?
+  /// The connection this secret owns. Reuse rebinds THIS row to the new client pubkey rather
+  /// than accumulating one connection per page load.
+  connectionId String?   @unique @map("connection_id")
+  lastUsedAt   DateTime? @map("last_used_at")
+  useCount     Int       @default(0) @map("use_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nsecKey NsecKey @relation(fields: [nsecKeyId], references: [id], onDelete: Cascade)
+
+  @@index([nsecKeyId])
+  @@map("bunker_secrets")
 }
