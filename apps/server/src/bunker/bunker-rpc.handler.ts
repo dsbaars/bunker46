@@ -13,6 +13,9 @@ import {
 
 /** Resolved pending bunker:// secret: who/which key to bind, plus the operator's chosen permission seed. */
 type PendingSecretResult = {
+  secretId: string;
+  /** Set once this secret has created a connection; reuse rebinds that connection. */
+  connectionId?: string;
   userId: string;
   nsecKeyId: string;
   name: string;
@@ -26,7 +29,10 @@ export class BunkerRpcHandler {
   private pendingSecretLookup?: (
     signerPubkey: string,
     secret: string,
-  ) => PendingSecretResult | undefined;
+  ) => Promise<PendingSecretResult | undefined>;
+
+  /** Records which connection a secret owns, so a later reuse rebinds rather than duplicating. */
+  private secretBinder?: (secretId: string, connectionId: string) => Promise<void>;
 
   constructor(
     private readonly connections: ConnectionsService,
@@ -36,9 +42,13 @@ export class BunkerRpcHandler {
   ) {}
 
   setPendingSecretLookup(
-    fn: (signerPubkey: string, secret: string) => PendingSecretResult | undefined,
+    fn: (signerPubkey: string, secret: string) => Promise<PendingSecretResult | undefined>,
   ) {
     this.pendingSecretLookup = fn;
+  }
+
+  setSecretBinder(fn: (secretId: string, connectionId: string) => Promise<void>) {
+    this.secretBinder = fn;
   }
 
   async handleRequest(
@@ -290,7 +300,7 @@ export class BunkerRpcHandler {
       return null;
     }
 
-    const info = this.pendingSecretLookup(signerPubkey, secret);
+    const info = await this.pendingSecretLookup(signerPubkey, secret);
     if (!info) {
       this.logger.warn(
         `No matching pending secret for connect from ${clientPubkey.slice(0, 12)}...`,
@@ -298,12 +308,33 @@ export class BunkerRpcHandler {
       return null;
     }
 
-    this.logger.log(
-      `Auto-creating connection for ${clientPubkey.slice(0, 12)}... via bunker:// URI`,
-    );
-
     try {
-      await this.connections.createConnection(
+      // A web client that mints a fresh ephemeral client key on every page load will re-present
+      // this same URI under a new pubkey. Rebind the connection the secret already owns instead of
+      // creating a new row per load, so the operator sees one connection per app and the
+      // permissions they granted survive a reload.
+      if (info.connectionId) {
+        const rebound = await this.connections.rebindClientPubkey(info.connectionId, clientPubkey);
+        if (rebound) {
+          this.logger.log(
+            `Rebound connection ${info.connectionId} to new client ${clientPubkey.slice(0, 12)}...`,
+          );
+          return rebound;
+        }
+        // Falls through to create a fresh connection only when the old one is gone. A REVOKED
+        // connection returns null here AND is not recreated: revocation must not be undone by
+        // replaying the URI that created it.
+        this.logger.warn(
+          `Secret ${info.secretId} owns connection ${info.connectionId}, which is revoked or deleted; refusing to rebind`,
+        );
+        return null;
+      }
+
+      this.logger.log(
+        `Auto-creating connection for ${clientPubkey.slice(0, 12)}... via bunker:// URI`,
+      );
+
+      const created = await this.connections.createConnection(
         info.userId,
         info.nsecKeyId,
         clientPubkey,
@@ -314,6 +345,8 @@ export class BunkerRpcHandler {
         },
         info.permissions,
       );
+
+      if (this.secretBinder) await this.secretBinder(info.secretId, created.id);
 
       return this.connections.findByClientAndSigner(clientPubkey, signerPubkey);
     } catch (err) {

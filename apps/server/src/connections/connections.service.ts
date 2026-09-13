@@ -1,12 +1,15 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { EventsService } from '../events/events.service.js';
+import { Prisma } from '@/generated/prisma/client.js';
 import type { ConnectionStatus as PrismaConnectionStatus } from '@/generated/prisma/client.js';
 import { DEFAULT_CONNECTION_PERMISSIONS, type PermissionDescriptor } from '@bunker46/shared-types';
 
 @Injectable()
 export class ConnectionsService {
+  private readonly logger = new Logger(ConnectionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
@@ -285,6 +288,48 @@ export class ConnectionsService {
       include: { permissions: true, nsecKey: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Point an existing connection at a new client pubkey.
+   *
+   * Used when a bunker:// URI is re-presented by a client that regenerated its ephemeral NIP-46
+   * keypair (the norm for web clients, which keep it in memory only). Rebinding keeps one
+   * connection per app, so the permissions the operator granted survive the client's key rotation.
+   *
+   * Returns null - and changes nothing - when the connection is REVOKED or gone. Replaying the URI
+   * that created a connection must never resurrect one the operator revoked.
+   */
+  async rebindClientPubkey(connectionId: string, clientPubkey: string) {
+    const existing = await this.prisma.bunkerConnection.findFirst({
+      where: { id: connectionId, status: { in: ['ACTIVE', 'PENDING'] } },
+    });
+    if (!existing) return null;
+    if (existing.clientPubkey === clientPubkey) {
+      return this.prisma.bunkerConnection.findUnique({
+        where: { id: connectionId },
+        include: { permissions: true, nsecKey: true },
+      });
+    }
+
+    try {
+      return await this.prisma.bunkerConnection.update({
+        where: { id: connectionId },
+        data: { clientPubkey },
+        include: { permissions: true, nsecKey: true },
+      });
+    } catch (err) {
+      // Unique violation on (clientPubkey, nsecKeyId): another connection - necessarily a REVOKED
+      // one, since a live one would have been found before we got here - already holds this pair.
+      // Leave both rows alone and reject the connect.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        this.logger.warn(
+          `Cannot rebind connection ${connectionId}: client ${clientPubkey.slice(0, 12)}... already bound to this key`,
+        );
+        return null;
+      }
+      throw err;
+    }
   }
 
   async getAllConnectionsForNsecKey(nsecKeyId: string) {

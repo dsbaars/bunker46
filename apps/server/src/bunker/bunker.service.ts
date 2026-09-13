@@ -13,6 +13,7 @@ import * as nip04 from 'nostr-tools/nip04';
 import { BunkerRpcHandler } from './bunker-rpc.handler.js';
 import {
   Nip46RequestSchema,
+  PermissionDescriptorSchema,
   SafeRelayUrlSchema,
   type PermissionDescriptor,
 } from '@bunker46/shared-types';
@@ -22,6 +23,7 @@ import { EncryptionService } from '../common/crypto/encryption.service.js';
 import { useWebSocketImplementation } from 'nostr-tools/pool';
 import { normalizeURL } from 'nostr-tools/utils';
 import WebSocket from 'ws';
+import { createHash } from 'node:crypto';
 
 useWebSocketImplementation(WebSocket);
 
@@ -30,6 +32,22 @@ interface ActiveListener {
   /** Decrypted signer nsec (hex), kept so the watchdog can re-subscribe on disconnect. */
   nsecHex: string;
   close: () => void;
+}
+
+/**
+ * A bunker:// secret is a bearer credential: anyone holding it can bind a new client to the key.
+ * Store only its hash so a database leak does not hand out working URIs. No salt or KDF is used
+ * or needed - the secret is 128 bits of CSPRNG output, not a guessable password, and the lookup
+ * must be a single indexed query.
+ */
+function hashSecret(secret: string): string {
+  return createHash('sha256').update(secret).digest('hex');
+}
+
+/** A resolved bunker:// secret, plus the connection it already owns (if it has been used before). */
+export interface ResolvedSecret extends PendingSecretInfo {
+  secretId: string;
+  connectionId?: string;
 }
 
 export interface PendingSecretInfo {
@@ -45,7 +63,6 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BunkerService.name);
   private pool: SimplePool;
   private activeListeners = new Map<string, ActiveListener>();
-  private pendingSecrets = new Map<string, PendingSecretInfo>();
   private watchdogHandle?: ReturnType<typeof setInterval>;
 
   constructor(
@@ -63,6 +80,9 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
 
     this.rpcHandler.setPendingSecretLookup((signerPubkey, secret) => {
       return this.consumePendingSecret(signerPubkey, secret);
+    });
+    this.rpcHandler.setSecretBinder((secretId, connectionId) => {
+      return this.bindSecretToConnection(secretId, connectionId);
     });
 
     await this.resumeAllListeners();
@@ -137,22 +157,81 @@ export class BunkerService implements OnModuleInit, OnModuleDestroy {
     this.startListeningForKey(pubkey, nsecHex, relays);
   }
 
-  registerPendingSecret(signerPubkey: string, secret: string, info: PendingSecretInfo) {
-    const key = `${signerPubkey}:${secret}`;
-    this.pendingSecrets.set(key, info);
-    setTimeout(() => this.pendingSecrets.delete(key), 10 * 60 * 1000);
-    this.logger.debug(`Registered pending secret for ${signerPubkey.slice(0, 12)}...`);
+  /**
+   * Persist a freshly generated bunker:// secret so the URI keeps working for repeat connects.
+   *
+   * Previously this lived in an in-memory Map, was deleted on first use and expired after ten
+   * minutes. That authorises exactly one client keypair, which breaks the common web-client
+   * pattern of minting a fresh ephemeral client key on every page load while replaying the same
+   * stored bunker:// URI - the second load arrives as an unknown client and is rejected.
+   *
+   * Only the hash is stored; see `hashSecret`.
+   */
+  async registerPendingSecret(signerPubkey: string, secret: string, info: PendingSecretInfo) {
+    await this.prisma.bunkerSecret.create({
+      data: {
+        userId: info.userId,
+        nsecKeyId: info.nsecKeyId,
+        secretHash: hashSecret(secret),
+        name: info.name,
+        permissions: info.permissions ?? undefined,
+      },
+    });
+    this.logger.debug(`Registered bunker secret for ${signerPubkey.slice(0, 12)}...`);
   }
 
-  consumePendingSecret(signerPubkey: string, secret: string): PendingSecretInfo | undefined {
-    const key = `${signerPubkey}:${secret}`;
-    const info = this.pendingSecrets.get(key);
-    if (info) this.pendingSecrets.delete(key);
-    return info;
+  /**
+   * Resolve a secret presented on `connect`. Unlike the previous consume-once behaviour this does
+   * not invalidate the secret - the same URI may rebind as often as the client needs.
+   *
+   * The secret is scoped to its own nsec key: a secret minted for one key can never bind a
+   * connection to another, even if the hash somehow collided across users.
+   */
+  async consumePendingSecret(
+    signerPubkey: string,
+    secret: string,
+  ): Promise<ResolvedSecret | undefined> {
+    const record = await this.prisma.bunkerSecret.findUnique({
+      where: { secretHash: hashSecret(secret) },
+      include: { nsecKey: { select: { publicKey: true } } },
+    });
+    if (!record) return undefined;
+    if (record.nsecKey.publicKey !== signerPubkey) {
+      this.logger.warn(
+        `Bunker secret presented for the wrong signer ${signerPubkey.slice(0, 12)}...`,
+      );
+      return undefined;
+    }
+
+    await this.prisma.bunkerSecret.update({
+      where: { id: record.id },
+      data: { lastUsedAt: new Date(), useCount: { increment: 1 } },
+    });
+
+    // Re-validated on every use rather than trusted from registration time: the operator may have
+    // changed the seed, and a stored Json blob is not guaranteed to still parse.
+    const parsedPerms = PermissionDescriptorSchema.array().safeParse(record.permissions);
+
+    return {
+      secretId: record.id,
+      connectionId: record.connectionId ?? undefined,
+      userId: record.userId,
+      nsecKeyId: record.nsecKeyId,
+      name: record.name,
+      permissions: parsedPerms.success ? parsedPerms.data : undefined,
+    };
   }
 
-  getPendingSecretCount(): number {
-    return this.pendingSecrets.size;
+  /** Remember which connection a secret owns, so later reuse rebinds instead of duplicating. */
+  async bindSecretToConnection(secretId: string, connectionId: string) {
+    await this.prisma.bunkerSecret.update({
+      where: { id: secretId },
+      data: { connectionId },
+    });
+  }
+
+  async getPendingSecretCount(): Promise<number> {
+    return this.prisma.bunkerSecret.count();
   }
 
   private async getBaseRelayUrlsForUser(userId: string): Promise<string[]> {
