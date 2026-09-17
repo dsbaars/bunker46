@@ -17,11 +17,11 @@
   },
   "dependencies": {
     "@bunker46/shared-types": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@bunker46/tsconfig": "workspace:*",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.1"
   }
 }

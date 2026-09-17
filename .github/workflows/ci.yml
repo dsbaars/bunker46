@@ -184,12 +184,18 @@ jobs:
       - name: Push database schema
         run: pnpm --filter @bunker46/server run db:push
 
+      # Key the browser cache on the installed Playwright version so a bump invalidates it
+      # (a stale cache hit would leave the old Chromium build behind and fail the run).
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm --filter @bunker46/web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-1.58.2
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers (Chromium)
         if: steps.playwright-cache.outputs.cache-hit != 'true'

@@ -30,7 +30,7 @@ Screenshots are captured with Playwright (WebP). The connections screenshot uses
 | Layer        | Technology                                                                   |
 | ------------ | ---------------------------------------------------------------------------- |
 | **Frontend** | Vue 3, Vite 8, Tailwind CSS v4, shadcn-vue, nanostores, localforage          |
-| **Backend**  | NestJS 11, Fastify, Prisma ORM 7 (driver adapter), nostr-tools               |
+| **Backend**  | NestJS 12, Fastify, Prisma ORM 7 (driver adapter), nostr-tools               |
 | **Database** | PostgreSQL 17                                                                |
 | **Auth**     | JWT + Argon2, TOTP (otplib), WebAuthn/Passkeys (@simplewebauthn)             |
 | **Testing**  | Vitest, Playwright, eslint-plugin-security                                   |
@@ -209,7 +209,7 @@ To check for outdated packages across the monorepo:
 pnpm outdated -r
 ```
 
-The monorepo tracks current major versions (TypeScript 6, Vite 8, Prisma 7, Vitest 4, Vue Router 5, Zod 4). Run `pnpm outdated -r` periodically and upgrade deliberately, running the full test suite after each bump.
+The monorepo tracks current major versions (NestJS 12, TypeScript 6, Vite 8, Prisma 7, Vitest 5, Vue Router 5, Zod 4). Run `pnpm outdated -r` periodically and upgrade deliberately, running the full test suite after each bump.
 
 ## License
 
