@@ -1,5 +1,7 @@
 import { Logger } from '@nestjs/common';
 
+const WS_CLOSED_BEFORE_ESTABLISHED = 'WebSocket was closed before the connection was established';
+
 /**
  * nostr-tools' relay pool throws `SendingOnClosedConnection` asynchronously from a WebSocket
  * 'open' handler when a subscription re-fires on a socket that closed mid-reconnect. The throw
@@ -8,9 +10,15 @@ import { Logger } from '@nestjs/common';
  * bunker process, which — with no restart policy — then stayed down for days. These errors are
  * transient and safe to ignore: the connection watchdog re-subscribes the dropped relay shortly
  * after.
+ *
+ * The same applies to `ws`'s "WebSocket was closed before the connection was established": the
+ * pool's connect timeout closes a socket that is still CONNECTING and `ws` raises this outside our
+ * call stack. Treating it as fatal let a single unreachable or slow relay crash-loop the whole
+ * bunker — and every restart also wiped the in-memory pending bunker:// connect secrets.
  */
 export function isTransientRelayError(err: unknown): boolean {
-  return err instanceof Error && err.name === 'SendingOnClosedConnection';
+  if (!(err instanceof Error)) return false;
+  return err.name === 'SendingOnClosedConnection' || err.message === WS_CLOSED_BEFORE_ESTABLISHED;
 }
 
 type ExitFn = (code: number) => void;

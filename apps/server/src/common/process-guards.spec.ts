@@ -9,12 +9,22 @@ describe('process-guards', () => {
       expect(isTransientRelayError(err)).toBe(true);
     });
 
+    it('matches ws "closed before the connection was established" from a relay connect timeout', () => {
+      const err = new Error('WebSocket was closed before the connection was established');
+      expect(isTransientRelayError(err)).toBe(true);
+    });
+
     it('rejects unrelated errors and non-Error values', () => {
       expect(isTransientRelayError(new Error('real bug'))).toBe(false);
       expect(isTransientRelayError('SendingOnClosedConnection')).toBe(false);
       expect(isTransientRelayError(null)).toBe(false);
       expect(isTransientRelayError(undefined)).toBe(false);
       expect(isTransientRelayError({ name: 'SendingOnClosedConnection' })).toBe(false);
+      expect(
+        isTransientRelayError({
+          message: 'WebSocket was closed before the connection was established',
+        }),
+      ).toBe(false);
     });
   });
 
@@ -30,6 +40,14 @@ describe('process-guards', () => {
       const err = new Error('closed');
       err.name = 'SendingOnClosedConnection';
       handle('exception', err);
+      expect(exit).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it('swallows a relay connect timeout without exiting', () => {
+      const { logger, exit, handle } = setup();
+      handle('exception', new Error('WebSocket was closed before the connection was established'));
       expect(exit).not.toHaveBeenCalled();
       expect(logger.warn).toHaveBeenCalledOnce();
       expect(logger.error).not.toHaveBeenCalled();
