@@ -127,7 +127,15 @@ export class BunkerRpcHandler {
             }
           }
 
-          result = connection.secret || 'ack';
+          // NIP-46: `connect` returns "ack" OR <required-secret-value>. Echo the secret only when
+          // this request presented it and it matches the one the connection was established with
+          // (the first bunker:// pairing, or a client that re-sends it); otherwise reply "ack".
+          // The bunker:// secret is single-use, so a client that keeps its keypair re-connects
+          // without it. Clients that accept only "ack" or the secret they sent (rust-nostr
+          // nostr-connect, e.g. ngit 3.x) rejected the stored secret and never sent sign_event.
+          const presentedSecret = request.params[1];
+          result =
+            presentedSecret && presentedSecret === connection.secret ? presentedSecret : 'ack';
           break;
         }
 
