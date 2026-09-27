@@ -71,6 +71,7 @@ describe('BunkerRpcHandler', () => {
       setPermissions: vi.fn().mockResolvedValue(undefined as never),
       requestPermissions: vi.fn().mockResolvedValue(undefined as never),
       touchActivity: vi.fn().mockResolvedValue(undefined as never),
+      createConnection: vi.fn().mockResolvedValue(undefined as never),
     };
     loggingService = { logSigningAction: vi.fn().mockResolvedValue(undefined as never) };
     eventsService = { publishUserActivity: vi.fn().mockResolvedValue(undefined as never) };
@@ -196,13 +197,68 @@ describe('BunkerRpcHandler', () => {
   });
 
   describe('connect handshake', () => {
-    it('activates a PENDING connection and echoes its secret', async () => {
+    it('activates a PENDING connection and echoes the secret the client presented', async () => {
       vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
         makeConnection([], 'PENDING', 'the-secret') as never,
       );
-      const res = await handle(request('connect', ['', '']));
+      const res = await handle(request('connect', [SIGNER, 'the-secret']));
       expect(connections.updateConnectionStatus).toHaveBeenCalledWith('conn-1', 'ACTIVE');
       expect(res.result).toBe('the-secret');
+    });
+
+    it('first bunker:// pairing consumes the pending secret and echoes it', async () => {
+      const lookup = vi
+        .fn()
+        .mockReturnValue({ userId: 'user-1', nsecKeyId: 'key-1', name: 'New App' });
+      handler.setPendingSecretLookup(lookup);
+      vi.mocked(connections.findByClientAndSigner!)
+        .mockResolvedValueOnce(null as never)
+        .mockResolvedValueOnce(makeConnection([], 'PENDING', 'pairing-secret') as never);
+      const res = await handle(request('connect', [SIGNER, 'pairing-secret']));
+      expect(lookup).toHaveBeenCalledWith(SIGNER, 'pairing-secret');
+      expect(connections.createConnection).toHaveBeenCalledWith(
+        'user-1',
+        'key-1',
+        CLIENT,
+        expect.objectContaining({ secret: 'pairing-secret' }),
+        undefined,
+      );
+      expect(connections.updateConnectionStatus).toHaveBeenCalledWith('conn-1', 'ACTIVE');
+      expect(res).toEqual({ id: 'req-1', result: 'pairing-secret', error: undefined });
+    });
+
+    // A bound client re-connecting without its (single-use, already consumed) secret is what a
+    // rust-nostr nostr-connect client sends on every restored session (e.g. ngit 3.x). It accepts
+    // only "ack" or the secret it sent, so answering with the stored secret made it abort.
+    it('answers "ack", not the stored secret, on a re-connect without a secret', async () => {
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
+        makeConnection([], 'ACTIVE', 'the-secret') as never,
+      );
+      const cases: string[][] = [[SIGNER], [SIGNER, '']];
+      for (const params of cases) {
+        const res = await handle(request('connect', params));
+        expect(res.result).toBe('ack');
+        expect(res.error).toBeUndefined();
+        expect(JSON.stringify(res)).not.toContain('the-secret');
+      }
+      expect(connections.updateConnectionStatus).not.toHaveBeenCalled();
+    });
+
+    it('answers "ack" when a different secret is presented', async () => {
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
+        makeConnection([], 'ACTIVE', 'the-secret') as never,
+      );
+      const res = await handle(request('connect', [SIGNER, 'some-other-secret']));
+      expect(res.result).toBe('ack');
+      expect(JSON.stringify(res)).not.toContain('the-secret');
+    });
+
+    it('answers "ack" when the connection has no stored secret', async () => {
+      vi.mocked(connections.findByClientAndSigner!).mockResolvedValue(
+        makeConnection([], 'ACTIVE') as never,
+      );
+      expect((await handle(request('connect', [SIGNER]))).result).toBe('ack');
+      expect((await handle(request('connect', [SIGNER, 'anything']))).result).toBe('ack');
     });
 
     it('records client-requested permissions as PENDING (not granted) on connect', async () => {
